@@ -1,0 +1,156 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enum for transaction flow direction
+enum TransactionFlow {
+  ENTRADA // Income
+  SAIDA   // Outgoing
+}
+
+// Enum for major expense categories
+enum MajorCategory {
+  RENDIMENTO              // Income
+  RENDIMENTO_EXTRA        // Extra Income
+  ECONOMIA_INVESTIMENTOS  // Economy & Investments
+  CUSTOS_FIXOS           // Fixed Costs
+  CUSTOS_VARIAVEIS       // Variable Costs
+  GASTOS_SEM_CULPA       // Guilt-free Spending
+}
+
+// Enum for months
+enum Month {
+  JANEIRO
+  FEVEREIRO
+  MARCO
+  ABRIL
+  MAIO
+  JUNHO
+  JULHO
+  AGOSTO
+  SETEMBRO
+  OUTUBRO
+  NOVEMBRO
+  DEZEMBRO
+}
+
+// Origins table (who made the transaction)
+model Origin {
+  id           String        @id @default(cuid())
+  name         String        @unique // "Comum", "Joana", "Diogo"
+  transactions Transaction[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("origins")
+}
+
+// Banks table
+model Bank {
+  id           String        @id @default(cuid())
+  name         String        @unique // "Activo Bank", "Millenium BCP", etc.
+  transactions Transaction[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("banks")
+}
+
+// Categories table with hierarchical structure
+model Category {
+  id             String        @id @default(cuid())
+  flow           TransactionFlow // IN/OUT (Entrada/Saida)
+  majorCategory  MajorCategory   // Major Category
+  category       String          // Category
+  subCategory    String          // SubCategory
+  transactions   Transaction[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  // Unique constraint on the combination of all category levels
+  @@unique([flow, majorCategory, category, subCategory])
+  @@map("categories")
+}
+
+// Main transactions table
+model Transaction {
+  id            String          @id @default(cuid())
+  
+  // Core transaction data
+  date          DateTime        // Transaction date
+  origin        Origin          @relation(fields: [originId], references: [id])
+  originId      String
+  bank          Bank            @relation(fields: [bankId], references: [id])
+  bankId        String
+  
+  // Categorization
+  flow          TransactionFlow // IN/OUT (Entrada/Saida)
+  category      Category        @relation(fields: [categoryId], references: [id])
+  categoryId    String
+  
+  // Transaction details
+  description   String          // Transaction description
+  incomes       Decimal?        @db.Decimal(10, 2) // Income amount (if flow is ENTRADA)
+  outgoings     Decimal?        @db.Decimal(10, 2) // Outgoing amount (if flow is SAIDA)
+  notes         String?         // Additional notes
+  
+  // Time categorization
+  month         Month           // Month extracted from date
+  year          Int             // Year extracted from date
+  
+  // Metadata
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  
+  // GoCardless integration fields
+  externalId    String?         @unique // External transaction ID from bank API
+  rawData       Json?           // Store raw transaction data from API
+  
+  // AI/ML categorization confidence
+  aiConfidence  Float?          @db.Real // Confidence score (0-1) for AI categorization
+  isAiGenerated Boolean         @default(false) // Whether categorization was AI-generated
+  isValidated   Boolean         @default(false) // Whether user has validated the categorization
+
+  @@map("transactions")
+}
+
+// User management for family members
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String   // Hashed password
+  role      UserRole @default(USER)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+// Audit log for tracking changes
+model AuditLog {
+  id        String   @id @default(cuid())
+  tableName String   // Which table was modified
+  recordId  String   // ID of the modified record
+  action    String   // CREATE, UPDATE, DELETE
+  oldValues Json?    // Previous values (for UPDATE/DELETE)
+  newValues Json?    // New values (for CREATE/UPDATE)
+  userId    String?  // User who made the change
+  timestamp DateTime @default(now())
+
+  @@map("audit_logs")
+}

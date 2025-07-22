@@ -13,7 +13,11 @@
     "test:watch": "vitest --watch",
     "test:coverage": "vitest --coverage",
     "test:e2e": "playwright test",
-    "prepare": "husky install"
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:reset": "prisma migrate reset",
+    "db:studio": "prisma studio"
   },
   "dependencies": {
     "next": "^14.0.0",
@@ -30,7 +34,9 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "lucide-react": "^0.290.0",
-    "tailwind-merge": "^2.0.0"
+    "tailwind-merge": "^2.0.0",
+    "prisma": "^5.22.0",
+    "@prisma/client": "^5.22.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
