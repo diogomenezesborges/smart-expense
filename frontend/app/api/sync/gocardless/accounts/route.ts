@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { gocardlessService } from '@/lib/services/gocardless';
+import { gocardlessApiService } from '@/lib/services/gocardless-api';
 
 // GET /api/sync/gocardless/accounts - List all connected GoCardless accounts
 export async function GET() {
   try {
-    const accounts = await gocardlessService.getAccounts();
+    const accounts = await gocardlessApiService.getAccounts();
     
     const enrichedAccounts = await Promise.all(
       accounts.map(async (account) => {
         try {
           const [balances, recentTransactions] = await Promise.all([
-            gocardlessService.getBalances(account.id),
-            gocardlessService.getTransactions(account.id, undefined, undefined)
+            gocardlessApiService.getBalances(account.id),
+            gocardlessApiService.getTransactions(account.id, undefined, undefined)
           ]);
 
           return {

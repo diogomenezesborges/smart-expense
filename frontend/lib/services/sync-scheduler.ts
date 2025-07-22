@@ -1,5 +1,5 @@
 import * as cron from 'node-cron';
-import { gocardlessService } from './gocardless';
+import { gocardlessApiService } from './gocardless-api';
 import { prisma } from '@/lib/database/client';
 
 interface SyncJob {
@@ -114,7 +114,7 @@ export class SyncScheduler {
           break;
       }
 
-      const result = await gocardlessService.syncAllAccounts(dateFrom, dateTo);
+      const result = await gocardlessApiService.syncAllAccounts(dateFrom, dateTo);
 
       // Log sync results
       await this.logSyncResult(jobId, result);
@@ -227,7 +227,7 @@ export class SyncScheduler {
       await this.executeSyncJob(jobId);
     } else {
       // Trigger a manual sync similar to daily-sync
-      const result = await gocardlessService.syncAllAccounts();
+      const result = await gocardlessApiService.syncAllAccounts();
       await this.logSyncResult('manual-sync', result);
       return result;
     }

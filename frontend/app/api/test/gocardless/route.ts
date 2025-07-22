@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { gocardlessService } from '@/lib/services/gocardless';
+import { gocardlessApiService } from '@/lib/services/gocardless-api';
 
 // GET /api/test/gocardless - Test GoCardless integration
 export async function GET() {
   try {
     // Test connection by fetching accounts
-    const accounts = await gocardlessService.getAccounts();
+    const accounts = await gocardlessApiService.getAccounts();
     
     const testResults = {
       connectionTest: 'PASSED',
@@ -23,7 +23,7 @@ export async function GET() {
     // Test fetching transactions for first account (if available)
     if (accounts.length > 0) {
       try {
-        const transactions = await gocardlessService.getTransactions(
+        const transactions = await gocardlessApiService.getTransactions(
           accounts[0].id,
           undefined,
           undefined

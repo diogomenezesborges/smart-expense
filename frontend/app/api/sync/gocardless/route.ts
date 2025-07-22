@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { gocardlessService } from '@/lib/services/gocardless';
+import { gocardlessApiService } from '@/lib/services/gocardless-api';
 import { z } from 'zod';
 
 // Validation schema for sync request
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
 
     if (accountId) {
       // Sync specific account
-      result = await gocardlessService.syncAccountTransactions(
+      result = await gocardlessApiService.syncAccountTransactions(
         accountId,
         actualDateFrom,
         actualDateTo
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       });
     } else {
       // Sync all accounts
-      result = await gocardlessService.syncAllAccounts(
+      result = await gocardlessApiService.syncAllAccounts(
         actualDateFrom,
         actualDateTo
       );
@@ -80,13 +80,13 @@ export async function POST(request: NextRequest) {
 // GET /api/sync/gocardless - Get sync status and connected accounts
 export async function GET() {
   try {
-    const accounts = await gocardlessService.getAccounts();
+    const accounts = await gocardlessApiService.getAccounts();
     
     // Get summaries for all accounts
     const accountSummaries = await Promise.all(
       accounts.map(async (account) => {
         try {
-          const summary = await gocardlessService.getAccountSummary(account.id);
+          const summary = await gocardlessApiService.getAccountSummary(account.id);
           return {
             id: account.id,
             name: account.name,

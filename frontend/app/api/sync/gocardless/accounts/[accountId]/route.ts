@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { gocardlessService } from '@/lib/services/gocardless';
+import { gocardlessApiService } from '@/lib/services/gocardless-api';
 
 interface RouteParams {
   params: {
@@ -14,7 +14,7 @@ export async function GET(
 ) {
   try {
     const { accountId } = params;
-    const summary = await gocardlessService.getAccountSummary(accountId);
+    const summary = await gocardlessApiService.getAccountSummary(accountId);
 
     return NextResponse.json({
       success: true,
@@ -50,7 +50,7 @@ export async function POST(
     
     const dateTo = body.dateTo || new Date().toISOString().split('T')[0];
 
-    const result = await gocardlessService.syncAccountTransactions(
+    const result = await gocardlessApiService.syncAccountTransactions(
       accountId,
       dateFrom,
       dateTo
