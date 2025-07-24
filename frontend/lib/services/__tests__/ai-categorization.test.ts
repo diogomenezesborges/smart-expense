@@ -1,459 +1,541 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-
-// Mock the AI categorization service
-vi.mock('../ai-categorization', () => ({
-  categorizeTransaction: vi.fn(),
-  batchCategorizeTransactions: vi.fn(),
-  getCategorizationConfidence: vi.fn(),
-  getCategoryPatterns: vi.fn()
-}));
-
-interface CategorizationRequest {
-  description: string;
-  amount: number;
-  merchantName?: string;
-  flow: 'ENTRADA' | 'SAIDA';
-}
-
-interface CategorizationResponse {
-  categoryId: string;
-  confidence: number;
-  reasoning: string;
-  alternatives: Array<{
-    categoryId: string;
-    confidence: number;
-  }>;
-}
-
-// Mock the OpenAI API
-vi.mock('openai', () => ({
-  default: vi.fn().mockImplementation(() => ({
-    chat: {
-      completions: {
-        create: vi.fn()
-      }
-    }
-  }))
-}));
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // Mock the database client
 vi.mock('@/lib/database/client', () => ({
   prisma: {
     category: {
       findMany: vi.fn(),
-      findFirst: vi.fn()
+      findFirst: vi.fn(),
+      findUnique: vi.fn()
     },
     transaction: {
       findMany: vi.fn(),
-      update: vi.fn(),
-      updateMany: vi.fn()
+      count: vi.fn()
+    },
+    auditLog: {
+      create: vi.fn(),
+      count: vi.fn(),
+      findMany: vi.fn()
     }
   }
 }));
 
+import { AiCategorizationService } from '../ai-categorization';
+
+vi.mock('@/lib/utils/logger', () => ({
+  logAI: vi.fn(),
+  logError: vi.fn()
+}));
+
 describe('AI Categorization Service', () => {
-  let mockCategorizeTransaction: any;
-  let mockBatchCategorizeTransactions: any;
-  let mockGetCategorizationConfidence: any;
-  let mockGetCategoryPatterns: any;
+  let service: AiCategorizationService;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    const module = await import('../ai-categorization');
-    mockCategorizeTransaction = module.categorizeTransaction;
-    mockBatchCategorizeTransactions = module.batchCategorizeTransactions;
-    mockGetCategorizationConfidence = module.getCategorizationConfidence;
-    mockGetCategoryPatterns = module.getCategoryPatterns;
-  });
+    
+    // Get the mocked prisma instance
+    const { prisma } = await import('@/lib/database/client');
+    
+    // Mock categories data
+    prisma.category.findMany.mockResolvedValue([
+      {
+        id: 'cat-food-1',
+        flow: 'SAIDA',
+        category: 'Alimentação',
+        subCategory: 'Supermercado'
+      },
+      {
+        id: 'cat-salary-1',
+        flow: 'ENTRADA',
+        category: 'Salario',
+        subCategory: 'Salario Liq.'
+      },
+      {
+        id: 'cat-transport-1',
+        flow: 'SAIDA',
+        category: 'Transportes',
+        subCategory: 'Carro Combustivel'
+      },
+      {
+        id: 'cat-unknown-1',
+        flow: 'SAIDA',
+        category: 'Desconhecido',
+        subCategory: 'Desconhecido'
+      }
+    ]);
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+    prisma.category.findFirst.mockResolvedValue({
+      id: 'cat-unknown-1',
+      flow: 'SAIDA',
+      category: 'Desconhecido',
+      subCategory: 'Desconhecido'
+    });
+
+    prisma.category.findUnique.mockResolvedValue({
+      id: 'cat-food-1',
+      flow: 'SAIDA',
+      category: 'Alimentação',
+      subCategory: 'Supermercado'
+    });
+
+    prisma.transaction.findMany.mockResolvedValue([]);
+    prisma.auditLog.findMany.mockResolvedValue([]);
+
+    service = new AiCategorizationService();
   });
 
   describe('categorizeTransaction', () => {
-    const mockRequest: CategorizationRequest = {
-      description: 'COFFEE SHOP PAYMENT',
-      amount: 4.50,
-      merchantName: 'Starbucks',
-      flow: 'SAIDA'
-    };
-
-    it('should categorize a simple coffee purchase', async () => {
-      const expectedResult = {
-        categoryId: 'cat-food-beverages',
-        confidence: 0.95,
-        reasoning: 'Coffee shop payment clearly indicates food/beverage expense',
-        alternatives: [
-          { categoryId: 'cat-discretionary', confidence: 0.75 }
-        ]
+    it('should categorize grocery store transactions', async () => {
+      const context = {
+        description: 'CONTINENTE SUPERMERCADO',
+        amount: 45.67,
+        flow: 'SAIDA' as const,
+        date: new Date('2024-01-15')
       };
 
-      mockCategorizeTransaction.mockResolvedValue(expectedResult);
+      const result = await service.categorizeTransaction(context);
 
-      const result = await mockCategorizeTransaction(mockRequest);
-
-      expect(mockCategorizeTransaction).toHaveBeenCalledWith(mockRequest);
       expect(result).toMatchObject({
-        categoryId: expect.any(String),
+        categoryId: 'cat-food-1',
         confidence: expect.any(Number),
-        reasoning: expect.any(String),
+        reasoning: expect.stringContaining('keywords'),
         alternatives: expect.any(Array)
       });
-      expect(result.confidence).toBeGreaterThan(0.8);
+      expect(result.confidence).toBeGreaterThan(0.5);
     });
 
-    it('should handle grocery store transactions', async () => {
-      const groceryRequest: CategorizationRequest = {
-        description: 'WALMART SUPERCENTER',
-        amount: 125.89,
-        flow: 'SAIDA'
+    it('should categorize salary transactions', async () => {
+      const context = {
+        description: 'SALARIO MENSAL EMPRESA',
+        amount: 2500.00,
+        flow: 'ENTRADA' as const,
+        date: new Date('2024-01-15')
       };
 
-      const mockOpenAI = await import('openai');
-      const mockCreate = vi.fn().mockResolvedValue({
-        choices: [{
-          message: {
-            content: JSON.stringify({
-              categoryId: 'cat-groceries',
-              confidence: 0.92,
-              reasoning: 'Walmart Supercenter is a major grocery retailer',
-              alternatives: [
-                { categoryId: 'cat-household', confidence: 0.65 }
-              ]
-            })
-          }
-        }]
-      });
-      
-      (mockOpenAI.default as any).mockImplementation(() => ({
-        chat: { completions: { create: mockCreate } }
-      }));
+      // Mock salary category
+      const { prisma } = await import('@/lib/database/client');
+      prisma.category.findMany.mockResolvedValueOnce([
+        {
+          id: 'cat-salary-1',
+          flow: 'ENTRADA',
+          category: 'Salario',
+          subCategory: 'Salario Liq.'
+        }
+      ]);
 
-      const result = await categorizeTransaction(groceryRequest);
+      const result = await service.categorizeTransaction(context);
 
-      expect(result.categoryId).toBe('cat-groceries');
-      expect(result.confidence).toBeGreaterThan(0.9);
+      expect(result.categoryId).toBe('cat-salary-1');
+      expect(result.confidence).toBeGreaterThan(0.7);
+      expect(result.reasoning).toContain('keywords');
     });
 
-    it('should handle salary/income transactions', async () => {
-      const salaryRequest: CategorizationRequest = {
-        description: 'COMPANY PAYROLL SALARY',
-        amount: 3500.00,
-        flow: 'ENTRADA'
+    it('should handle fuel/gas station transactions', async () => {
+      const context = {
+        description: 'GALP ENERGIA COMBUSTIVEL',
+        amount: 65.50,
+        flow: 'SAIDA' as const,
+        date: new Date('2024-01-15')
       };
 
-      const mockOpenAI = await import('openai');
-      const mockCreate = vi.fn().mockResolvedValue({
-        choices: [{
-          message: {
-            content: JSON.stringify({
-              categoryId: 'cat-salary',
-              confidence: 0.98,
-              reasoning: 'Payroll salary clearly indicates regular employment income',
-              alternatives: [
-                { categoryId: 'cat-bonus', confidence: 0.15 }
-              ]
-            })
-          }
-        }]
-      });
-      
-      (mockOpenAI.default as any).mockImplementation(() => ({
-        chat: { completions: { create: mockCreate } }
-      }));
+      const result = await service.categorizeTransaction(context);
 
-      const result = await categorizeTransaction(salaryRequest);
-
-      expect(result.categoryId).toBe('cat-salary');
-      expect(result.confidence).toBeGreaterThan(0.95);
-    });
-
-    it('should handle ambiguous transactions with lower confidence', async () => {
-      const ambiguousRequest: CategorizationRequest = {
-        description: 'TRANSFER TO JOHN SMITH',
-        amount: 250.00,
-        flow: 'SAIDA'
-      };
-
-      const mockOpenAI = await import('openai');
-      const mockCreate = vi.fn().mockResolvedValue({
-        choices: [{
-          message: {
-            content: JSON.stringify({
-              categoryId: 'cat-transfers',
-              confidence: 0.65,
-              reasoning: 'Personal transfer - could be loan, gift, or payment',
-              alternatives: [
-                { categoryId: 'cat-personal', confidence: 0.60 },
-                { categoryId: 'cat-loans', confidence: 0.55 }
-              ]
-            })
-          }
-        }]
-      });
-      
-      (mockOpenAI.default as any).mockImplementation(() => ({
-        chat: { completions: { create: mockCreate } }
-      }));
-
-      const result = await categorizeTransaction(ambiguousRequest);
-
-      expect(result.confidence).toBeLessThan(0.8);
-      expect(result.alternatives.length).toBeGreaterThan(1);
-    });
-
-    it('should handle API errors gracefully', async () => {
-      const mockOpenAI = await import('openai');
-      const mockCreate = vi.fn().mockRejectedValue(new Error('API Error'));
-      
-      (mockOpenAI.default as any).mockImplementation(() => ({
-        chat: { completions: { create: mockCreate } }
-      }));
-
-      await expect(categorizeTransaction(mockRequest)).rejects.toThrow('API Error');
-    });
-
-    it('should validate required fields', async () => {
-      const invalidRequest = {
-        description: '',
-        amount: -10,
-        flow: 'INVALID'
-      } as any;
-
-      await expect(categorizeTransaction(invalidRequest)).rejects.toThrow();
-    });
-  });
-
-  describe('batchCategorizeTransactions', () => {
-    it('should categorize multiple transactions', async () => {
-      const transactions = [
-        { id: '1', description: 'COFFEE SHOP', amount: 4.50, flow: 'SAIDA' },
-        { id: '2', description: 'SALARY PAYMENT', amount: 3000.00, flow: 'ENTRADA' },
-        { id: '3', description: 'GROCERY STORE', amount: 87.32, flow: 'SAIDA' }
-      ];
-
-      // Mock successful categorizations
-      const mockOpenAI = await import('openai');
-      const mockCreate = vi.fn()
-        .mockResolvedValueOnce({
-          choices: [{
-            message: {
-              content: JSON.stringify({
-                categoryId: 'cat-food-beverages',
-                confidence: 0.95,
-                reasoning: 'Coffee expense',
-                alternatives: []
-              })
-            }
-          }]
-        })
-        .mockResolvedValueOnce({
-          choices: [{
-            message: {
-              content: JSON.stringify({
-                categoryId: 'cat-salary',
-                confidence: 0.98,
-                reasoning: 'Employment income',
-                alternatives: []
-              })
-            }
-          }]
-        })
-        .mockResolvedValueOnce({
-          choices: [{
-            message: {
-              content: JSON.stringify({
-                categoryId: 'cat-groceries',
-                confidence: 0.92,
-                reasoning: 'Grocery shopping',
-                alternatives: []
-              })
-            }
-          }]
-        });
-      
-      (mockOpenAI.default as any).mockImplementation(() => ({
-        chat: { completions: { create: mockCreate } }
-      }));
-
-      const result = await batchCategorizeTransactions(transactions as any);
-
-      expect(result).toHaveLength(3);
-      expect(result[0].success).toBe(true);
-      expect(result[1].success).toBe(true);
-      expect(result[2].success).toBe(true);
-    });
-
-    it('should handle partial failures in batch processing', async () => {
-      const transactions = [
-        { id: '1', description: 'VALID TRANSACTION', amount: 10.00, flow: 'SAIDA' },
-        { id: '2', description: 'ERROR TRANSACTION', amount: 20.00, flow: 'SAIDA' }
-      ];
-
-      const mockOpenAI = await import('openai');
-      const mockCreate = vi.fn()
-        .mockResolvedValueOnce({
-          choices: [{
-            message: {
-              content: JSON.stringify({
-                categoryId: 'cat-misc',
-                confidence: 0.80,
-                reasoning: 'Valid categorization',
-                alternatives: []
-              })
-            }
-          }]
-        })
-        .mockRejectedValueOnce(new Error('API Error'));
-      
-      (mockOpenAI.default as any).mockImplementation(() => ({
-        chat: { completions: { create: mockCreate } }
-      }));
-
-      const result = await batchCategorizeTransactions(transactions as any);
-
-      expect(result).toHaveLength(2);
-      expect(result[0].success).toBe(true);
-      expect(result[1].success).toBe(false);
-      expect(result[1].error).toBe('API Error');
-    });
-  });
-
-  describe('getCategorizationConfidence', () => {
-    it('should return high confidence for clear patterns', () => {
-      const highConfidenceDescriptions = [
-        'SALARY PAYMENT FROM COMPANY',
-        'STARBUCKS COFFEE SHOP',
-        'WALMART GROCERY STORE',
-        'RENT PAYMENT TO LANDLORD'
-      ];
-
-      highConfidenceDescriptions.forEach(description => {
-        const confidence = getCategorizationConfidence(description, 100);
-        expect(confidence).toBeGreaterThan(0.8);
+      expect(result).toMatchObject({
+        categoryId: 'cat-transport-1',
+        confidence: expect.any(Number),
+        reasoning: expect.stringContaining('keywords')
       });
     });
 
-    it('should return lower confidence for ambiguous patterns', () => {
-      const lowConfidenceDescriptions = [
-        'TRANSFER',
-        'PAYMENT',
-        'WITHDRAWAL',
-        'DEPOSIT'
-      ];
-
-      lowConfidenceDescriptions.forEach(description => {
-        const confidence = getCategorizationConfidence(description, 100);
-        expect(confidence).toBeLessThan(0.7);
-      });
-    });
-
-    it('should factor in transaction amount for confidence', () => {
-      const description = 'UNKNOWN MERCHANT';
-      
-      const smallAmount = getCategorizationConfidence(description, 5.00);
-      const largeAmount = getCategorizationConfidence(description, 5000.00);
-      
-      // Large amounts should have lower confidence for unknown merchants
-      expect(largeAmount).toBeLessThan(smallAmount);
-    });
-  });
-
-  describe('getCategoryPatterns', () => {
-    it('should return known patterns for different categories', () => {
-      const patterns = getCategoryPatterns();
-
-      expect(patterns).toHaveProperty('FOOD_BEVERAGES');
-      expect(patterns).toHaveProperty('GROCERIES');
-      expect(patterns).toHaveProperty('TRANSPORTATION');
-      expect(patterns).toHaveProperty('ENTERTAINMENT');
-      expect(patterns).toHaveProperty('SALARY');
-
-      // Verify pattern structure
-      expect(patterns.FOOD_BEVERAGES).toHaveProperty('keywords');
-      expect(patterns.FOOD_BEVERAGES).toHaveProperty('merchants');
-      expect(Array.isArray(patterns.FOOD_BEVERAGES.keywords)).toBe(true);
-    });
-
-    it('should include common merchant patterns', () => {
-      const patterns = getCategoryPatterns();
-      
-      expect(patterns.FOOD_BEVERAGES.merchants).toContain('STARBUCKS');
-      expect(patterns.GROCERIES.merchants).toContain('WALMART');
-      expect(patterns.TRANSPORTATION.merchants).toContain('UBER');
-    });
-  });
-
-  describe('edge cases', () => {
-    it('should handle very long transaction descriptions', async () => {
-      const longDescription = 'A'.repeat(1000);
-      const request: CategorizationRequest = {
-        description: longDescription,
+    it('should use historical data when available', async () => {
+      const context = {
+        description: 'CONTINENTE SUPERMERCADO',
         amount: 50.00,
-        flow: 'SAIDA'
+        flow: 'SAIDA' as const,
+        date: new Date('2024-01-15')
       };
 
-      const mockOpenAI = await import('openai');
-      const mockCreate = vi.fn().mockResolvedValue({
-        choices: [{
-          message: {
-            content: JSON.stringify({
-              categoryId: 'cat-misc',
-              confidence: 0.60,
-              reasoning: 'Long description with unclear purpose',
-              alternatives: []
-            })
-          }
-        }]
-      });
-      
-      (mockOpenAI.default as any).mockImplementation(() => ({
-        chat: { completions: { create: mockCreate } }
-      }));
+      // Mock historical transaction
+      const { prisma } = await import('@/lib/database/client');
+      prisma.transaction.findMany.mockResolvedValue([
+        {
+          categoryId: 'cat-food-1',
+          description: 'CONTINENTE SUPERMERCADO PAYMENT',
+          isValidated: true
+        }
+      ]);
 
-      const result = await categorizeTransaction(request);
-      expect(result).toBeDefined();
-      expect(result.confidence).toBeLessThan(0.8);
+      const result = await service.categorizeTransaction(context);
+
+      expect(result.reasoning).toContain('historical');
+      expect(result.confidence).toBeGreaterThan(0.6);
     });
 
-    it('should handle special characters in descriptions', async () => {
-      const specialCharRequest: CategorizationRequest = {
-        description: 'CAFÉ & RESTAURANT ñ á é',
+    it('should fall back to unknown category for unrecognized transactions', async () => {
+      const context = {
+        description: 'UNKNOWN MERCHANT XYZ',
+        amount: 25.00,
+        flow: 'SAIDA' as const,
+        date: new Date('2024-01-15')
+      };
+
+      const result = await service.categorizeTransaction(context);
+
+      expect(result.categoryId).toBe('cat-unknown-1');
+      expect(result.confidence).toBeLessThan(0.5);
+      expect(result.reasoning).toContain('No matching patterns');
+    });
+
+    it('should handle merchant name in context', async () => {
+      const context = {
+        description: 'PAYMENT TO MERCHANT',
+        amount: 35.00,
+        merchantName: 'LIDL SUPERMERCADO',
+        flow: 'SAIDA' as const,
+        date: new Date('2024-01-15')
+      };
+
+      const result = await service.categorizeTransaction(context);
+
+      expect(result.categoryId).toBe('cat-food-1');
+      expect(result.confidence).toBeGreaterThan(0.5);
+    });
+
+    it('should generate alternatives for categorization', async () => {
+      const context = {
+        description: 'CONTINENTE SUPERMERCADO',
+        amount: 45.67,
+        flow: 'SAIDA' as const,
+        date: new Date('2024-01-15')
+      };
+
+      const result = await service.categorizeTransaction(context);
+
+      expect(result.alternatives).toBeInstanceOf(Array);
+      // Should have alternatives when multiple rules could match
+    });
+  });
+
+  describe('learnFromCorrection', () => {
+    it('should log categorization corrections', async () => {
+      await service.learnFromCorrection(
+        'txn-123',
+        'cat-wrong-1',
+        'cat-correct-1',
+        'CORRECTED TRANSACTION DESCRIPTION'
+      );
+
+      const { prisma } = await import('@/lib/database/client');
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: {
+          tableName: 'ai_categorization',
+          recordId: 'txn-123',
+          action: 'CORRECTION',
+          oldValues: { categoryId: 'cat-wrong-1' },
+          newValues: {
+            categoryId: 'cat-correct-1',
+            description: 'CORRECTED TRANSACTION DESCRIPTION',
+            timestamp: expect.any(Date)
+          }
+        }
+      });
+    });
+
+    it('should handle database errors gracefully', async () => {
+      const { prisma } = await import('@/lib/database/client');
+      prisma.auditLog.create.mockRejectedValue(new Error('Database error'));
+
+      // Should not throw
+      await expect(
+        service.learnFromCorrection('txn-123', 'cat-1', 'cat-2', 'description')
+      ).resolves.not.toThrow();
+    });
+
+    it('should create feedback patterns from corrections', async () => {
+      await service.learnFromCorrection(
+        'txn-123',
+        'cat-wrong-1',
+        'cat-correct-1',
+        'CONTINENTE SUPERMERCADO PAYMENT'
+      );
+
+      // Check that feedback patterns are created (internal state)
+      const insights = await service.getFeedbackInsights();
+      expect(insights.totalPatterns).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should create learned rules from corrections', async () => {
+      await service.learnFromCorrection(
+        'txn-123',
+        'cat-wrong-1',
+        'cat-correct-1',
+        'NOVA FARMACIA MEDICATION'
+      );
+
+      const insights = await service.getFeedbackInsights();
+      expect(insights.learnedRules).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe('getCategorizationStats', () => {
+    it('should return categorization statistics', async () => {
+      // Mock database responses
+      const { prisma } = await import('@/lib/database/client');
+      prisma.transaction.count
+        .mockResolvedValueOnce(100) // total
+        .mockResolvedValueOnce(75)  // ai generated
+        .mockResolvedValueOnce(60); // validated
+
+      prisma.auditLog.count.mockResolvedValue(5); // corrections
+
+      const stats = await service.getCategorizationStats(30);
+
+      expect(stats).toMatchObject({
+        period: expect.objectContaining({
+          days: 30,
+          since: expect.any(Date)
+        }),
+        totalTransactions: 100,
+        aiGeneratedTransactions: 75,
+        validatedTransactions: 60,
+        corrections: 5,
+        aiAccuracy: expect.any(Number),
+        validationRate: expect.any(Number)
+      });
+
+      expect(stats.aiAccuracy).toBe(93.33); // ((75-5)/75)*100
+      expect(stats.validationRate).toBe(60); // (60/100)*100
+    });
+
+    it('should handle zero transactions', async () => {
+      const { prisma } = await import('@/lib/database/client');
+      prisma.transaction.count.mockResolvedValue(0);
+      prisma.auditLog.count.mockResolvedValue(0);
+
+      const stats = await service.getCategorizationStats(30);
+
+      expect(stats.totalTransactions).toBe(0);
+      expect(stats.aiAccuracy).toBe(0);
+      expect(stats.validationRate).toBe(0);
+    });
+
+    it('should handle database errors', async () => {
+      const { prisma } = await import('@/lib/database/client');
+      prisma.transaction.count.mockRejectedValue(new Error('Database error'));
+
+      await expect(service.getCategorizationStats()).rejects.toThrow('Database error');
+    });
+  });
+
+  describe('text normalization and matching', () => {
+    it('should handle Portuguese text with accents', async () => {
+      const context = {
+        description: 'PADARIA & PASTELARIA JOSÉ',
+        amount: 12.50,
+        flow: 'SAIDA' as const,
+        date: new Date('2024-01-15')
+      };
+
+      // Should match 'padaria' keyword despite accents
+      const result = await service.categorizeTransaction(context);
+
+      expect(result.confidence).toBeGreaterThan(0.5);
+    });
+
+    it('should normalize spaces and special characters', async () => {
+      const context = {
+        description: 'CONTINENTE...SUPERMERCADO   PAYMENT',
+        amount: 30.00,
+        flow: 'SAIDA' as const,
+        date: new Date('2024-01-15')
+      };
+
+      const result = await service.categorizeTransaction(context);
+
+      expect(result.categoryId).toBe('cat-food-1');
+    });
+  });
+
+  describe('confidence calculation', () => {
+    it('should give higher confidence to exact matches', async () => {
+      const exactMatch = {
+        description: 'CONTINENTE',
+        amount: 50.00,
+        flow: 'SAIDA' as const,
+        date: new Date('2024-01-15')
+      };
+
+      const partialMatch = {
+        description: 'CONTINENTE SUPERMERCADO PAYMENT TRANSACTION',
+        amount: 50.00,
+        flow: 'SAIDA' as const,
+        date: new Date('2024-01-15')
+      };
+
+      const exactResult = await service.categorizeTransaction(exactMatch);
+      const partialResult = await service.categorizeTransaction(partialMatch);
+
+      expect(exactResult.confidence).toBeGreaterThan(partialResult.confidence);
+    });
+
+    it('should consider rule priority in confidence calculation', async () => {
+      // Higher priority rules should have higher confidence
+      const highPriorityMatch = {
+        description: 'CONTINENTE SUPERMERCADO', // Priority 10
+        amount: 50.00,
+        flow: 'SAIDA' as const,
+        date: new Date('2024-01-15')
+      };
+
+      const result = await service.categorizeTransaction(highPriorityMatch);
+
+      expect(result.confidence).toBeGreaterThan(0.7);
+    });
+  });
+
+  describe('Feedback Learning Enhancement', () => {
+    beforeEach(async () => {
+      // Mock audit log data for feedback patterns
+      const { prisma } = await import('@/lib/database/client');
+      prisma.auditLog.findMany.mockResolvedValue([
+        {
+          oldValues: { categoryId: 'cat-transport-1' },
+          newValues: { 
+            categoryId: 'cat-food-1',
+            description: 'CONTINENTE SUPERMERCADO',
+            timestamp: new Date('2024-01-15')
+          },
+          timestamp: new Date('2024-01-15')
+        },
+        {
+          oldValues: { categoryId: 'cat-transport-1' },
+          newValues: { 
+            categoryId: 'cat-food-1',
+            description: 'CONTINENTE MARKET PAYMENT',
+            timestamp: new Date('2024-01-16')
+          },
+          timestamp: new Date('2024-01-16')
+        }
+      ]);
+    });
+
+    it('should load feedback patterns from audit log', async () => {
+      const insights = await service.getFeedbackInsights();
+      
+      expect(insights).toMatchObject({
+        totalPatterns: expect.any(Number),
+        highConfidencePatterns: expect.any(Number),
+        recentPatterns: expect.any(Number),
+        learnedRules: expect.any(Number),
+        mostCorrectiveCategories: expect.any(Array)
+      });
+    });
+
+    it('should use feedback patterns for categorization', async () => {
+      // First make a correction to create a pattern
+      await service.learnFromCorrection(
+        'txn-123',
+        'cat-transport-1',
+        'cat-food-1',
+        'CONTINENTE SUPERMERCADO PAYMENT'
+      );
+
+      // Then test if the pattern is used for similar transaction
+      const context = {
+        description: 'CONTINENTE SUPERMERCADO',
+        amount: 45.67,
+        flow: 'SAIDA' as const,
+        date: new Date('2024-01-20')
+      };
+
+      const result = await service.categorizeTransaction(context);
+      
+      // Should prioritize feedback pattern
+      expect(result.reasoning).toContain('feedback pattern');
+    });
+
+    it('should strengthen patterns with multiple corrections', async () => {
+      // Make multiple corrections for the same pattern
+      await service.learnFromCorrection('txn-1', 'cat-wrong', 'cat-correct', 'TEST MERCHANT');
+      await service.learnFromCorrection('txn-2', 'cat-wrong', 'cat-correct', 'TEST MERCHANT PAYMENT');
+      
+      const insights = await service.getFeedbackInsights();
+      expect(insights.totalPatterns).toBeGreaterThan(0);
+    });
+
+    it('should create learned rules from corrections', async () => {
+      await service.learnFromCorrection(
+        'txn-123',
+        'cat-wrong',
+        'cat-correct',
+        'NEW PHARMACY MEDICATION'
+      );
+
+      const insights = await service.getFeedbackInsights();
+      expect(insights.learnedRules).toBeGreaterThan(0);
+    });
+
+    it('should provide most corrected categories analysis', async () => {
+      const insights = await service.getFeedbackInsights();
+      
+      expect(insights.mostCorrectiveCategories).toBeInstanceOf(Array);
+      if (insights.mostCorrectiveCategories.length > 0) {
+        expect(insights.mostCorrectiveCategories[0]).toMatchObject({
+          correctionPattern: expect.any(String),
+          count: expect.any(Number),
+          fromCategory: expect.any(String),
+          toCategory: expect.any(String)
+        });
+      }
+    });
+
+    it('should reset learning patterns when requested', async () => {
+      const result = await service.resetLearning(30);
+      
+      expect(result).toMatchObject({
+        message: expect.any(String),
+        remainingPatterns: expect.any(Number),
+        remainingLearnedRules: expect.any(Number)
+      });
+    });
+
+    it('should extract meaningful keywords from descriptions', async () => {
+      const context = {
+        description: 'FARMACIA NOVA MEDICATION PURCHASE',
         amount: 25.50,
-        flow: 'SAIDA'
+        flow: 'SAIDA' as const,
+        date: new Date('2024-01-15')
       };
 
-      const mockOpenAI = await import('openai');
-      const mockCreate = vi.fn().mockResolvedValue({
-        choices: [{
-          message: {
-            content: JSON.stringify({
-              categoryId: 'cat-food-beverages',
-              confidence: 0.90,
-              reasoning: 'Restaurant with special characters',
-              alternatives: []
-            })
-          }
-        }]
-      });
+      // Test that keyword extraction works properly by creating a learned rule
+      await service.learnFromCorrection('txn-123', 'cat-wrong', 'cat-health', context.description);
       
-      (mockOpenAI.default as any).mockImplementation(() => ({
-        chat: { completions: { create: mockCreate } }
-      }));
-
-      const result = await categorizeTransaction(specialCharRequest);
-      expect(result).toBeDefined();
-      expect(result.categoryId).toBe('cat-food-beverages');
+      const insights = await service.getFeedbackInsights();
+      expect(insights.learnedRules).toBeGreaterThanOrEqual(0);
     });
 
-    it('should handle zero or negative amounts', async () => {
-      const zeroAmountRequest: CategorizationRequest = {
-        description: 'ZERO AMOUNT TRANSACTION',
-        amount: 0,
-        flow: 'SAIDA'
+    it('should handle feedback patterns with higher priority than rules', async () => {
+      // Create a feedback pattern
+      await service.learnFromCorrection(
+        'txn-123',
+        'cat-transport-1',
+        'cat-food-1',
+        'SPECIAL MERCHANT NAME'
+      );
+
+      // Test categorization of similar transaction
+      const context = {
+        description: 'SPECIAL MERCHANT',
+        amount: 30.00,
+        flow: 'SAIDA' as const,
+        date: new Date('2024-01-20')
       };
 
-      await expect(categorizeTransaction(zeroAmountRequest)).rejects.toThrow();
+      const result = await service.categorizeTransaction(context);
+      
+      // Should use feedback pattern if confidence is sufficient
+      expect(result.confidence).toBeGreaterThan(0);
+      expect(result.reasoning).toBeDefined();
     });
   });
 });

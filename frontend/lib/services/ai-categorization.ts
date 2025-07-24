@@ -27,14 +27,32 @@ interface CategoryRule {
   categoryId: string;
   priority: number;
   flow?: TransactionFlow;
+  isLearned?: boolean;
+  confidence?: number;
+  usageCount?: number;
+  lastUsed?: Date;
+}
+
+interface FeedbackPattern {
+  id: string;
+  description: string;
+  originalCategoryId: string;
+  correctedCategoryId: string;
+  keywords: string[];
+  confidence: number;
+  occurrences: number;
+  createdAt: Date;
+  lastUsed: Date;
 }
 
 export class AiCategorizationService {
   private categoryRules: CategoryRule[] = [];
+  private feedbackPatterns: FeedbackPattern[] = [];
   private isInitialized = false;
 
   constructor() {
     this.initializeRules();
+    this.loadFeedbackPatterns();
   }
 
   private async initializeRules() {
@@ -101,6 +119,67 @@ export class AiCategorizationService {
     this.isInitialized = true;
   }
 
+  private async loadFeedbackPatterns() {
+    try {
+      // Load feedback patterns from audit log
+      const corrections = await prisma.auditLog.findMany({
+        where: {
+          tableName: 'ai_categorization',
+          action: 'CORRECTION',
+        },
+        orderBy: { timestamp: 'desc' },
+        take: 1000, // Load recent corrections
+      });
+
+      // Group corrections by pattern to identify recurring patterns
+      const patternMap = new Map<string, {
+        corrections: any[];
+        keywords: Set<string>;
+        originalCategoryId: string;
+        correctedCategoryId: string;
+      }>();
+
+      for (const correction of corrections) {
+        const description = correction.newValues?.description || '';
+        const normalizedDesc = this.normalizeText(description);
+        const keywords = this.extractKeywords(normalizedDesc);
+        const patternKey = keywords.slice(0, 3).join('_'); // Use first 3 keywords as pattern key
+
+        if (!patternMap.has(patternKey)) {
+          patternMap.set(patternKey, {
+            corrections: [],
+            keywords: new Set(keywords),
+            originalCategoryId: correction.oldValues?.categoryId || '',
+            correctedCategoryId: correction.newValues?.categoryId || '',
+          });
+        }
+
+        const pattern = patternMap.get(patternKey)!;
+        pattern.corrections.push(correction);
+        keywords.forEach(keyword => pattern.keywords.add(keyword));
+      }
+
+      // Convert to feedback patterns
+      this.feedbackPatterns = Array.from(patternMap.entries())
+        .filter(([, pattern]) => pattern.corrections.length >= 2) // At least 2 occurrences
+        .map(([patternKey, pattern]) => ({
+          id: patternKey,
+          description: pattern.corrections[0]?.newValues?.description || '',
+          originalCategoryId: pattern.originalCategoryId,
+          correctedCategoryId: pattern.correctedCategoryId,
+          keywords: Array.from(pattern.keywords),
+          confidence: Math.min(pattern.corrections.length * 0.2, 0.9),
+          occurrences: pattern.corrections.length,
+          createdAt: new Date(pattern.corrections[pattern.corrections.length - 1]?.timestamp),
+          lastUsed: new Date(pattern.corrections[0]?.timestamp),
+        }));
+
+    } catch (error) {
+      console.error('Error loading feedback patterns:', error);
+      this.feedbackPatterns = [];
+    }
+  }
+
   private findCategoryId(categories: any[], flow: string, category: string, subCategory: string): string {
     const found = categories.find(c => 
       c.flow === flow && 
@@ -118,6 +197,18 @@ export class AiCategorizationService {
       .replace(/[^\w\s]/g, ' ') // Replace non-alphanumeric with spaces
       .replace(/\s+/g, ' ') // Normalize spaces
       .trim();
+  }
+
+  private extractKeywords(text: string): string[] {
+    const normalized = this.normalizeText(text);
+    const words = normalized.split(' ');
+    
+    // Filter meaningful keywords (length > 2, not common words)
+    const stopWords = new Set(['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'de', 'da', 'do', 'em', 'com', 'para', 'por']);
+    
+    return words
+      .filter(word => word.length > 2 && !stopWords.has(word))
+      .slice(0, 5); // Take first 5 meaningful words
   }
 
   private calculateKeywordMatch(text: string, keywords: string[]): number {
@@ -217,12 +308,49 @@ export class AiCategorizationService {
     return commonWords.length / totalWords;
   }
 
+  private checkFeedbackPatterns(context: CategorizationContext): { categoryId: string; confidence: number; reasoning: string } | null {
+    const searchText = `${context.description} ${context.merchantName || ''}`;
+    const keywords = this.extractKeywords(searchText);
+    
+    // Find matching feedback patterns
+    const matches = this.feedbackPatterns
+      .filter(pattern => {
+        // Check if any pattern keywords match
+        return pattern.keywords.some(keyword => 
+          keywords.some(ctxKeyword => 
+            this.normalizeText(keyword).includes(this.normalizeText(ctxKeyword)) ||
+            this.normalizeText(ctxKeyword).includes(this.normalizeText(keyword))
+          )
+        );
+      })
+      .map(pattern => ({
+        pattern,
+        score: this.calculateKeywordMatch(searchText, pattern.keywords),
+      }))
+      .filter(match => match.score > 0)
+      .sort((a, b) => (b.score * b.pattern.confidence) - (a.score * a.pattern.confidence));
+
+    if (matches.length > 0) {
+      const bestMatch = matches[0];
+      return {
+        categoryId: bestMatch.pattern.correctedCategoryId,
+        confidence: Math.min(bestMatch.pattern.confidence * 0.9, 0.85), // Slightly lower than perfect confidence
+        reasoning: `Based on user feedback pattern (${bestMatch.pattern.occurrences} corrections)`,
+      };
+    }
+
+    return null;
+  }
+
   async categorizeTransaction(context: CategorizationContext): Promise<CategorizationResult> {
     await this.initializeRules();
 
     const searchText = `${context.description} ${context.merchantName || ''}`;
     
-    // Try historical categorization first
+    // Check feedback patterns first (highest priority)
+    const feedbackMatch = this.checkFeedbackPatterns(context);
+    
+    // Try historical categorization
     const historicalMatch = await this.getHistoricalCategorization(context);
     
     // Try rule-based categorization
@@ -238,7 +366,14 @@ export class AiCategorizationService {
     // Determine best categorization
     let bestResult: { categoryId: string; confidence: number; reasoning: string };
 
-    if (historicalMatch && historicalMatch.confidence > 0.6) {
+    if (feedbackMatch && feedbackMatch.confidence > 0.5) {
+      // Use feedback pattern if available (highest priority)
+      bestResult = {
+        categoryId: feedbackMatch.categoryId,
+        confidence: feedbackMatch.confidence,
+        reasoning: feedbackMatch.reasoning,
+      };
+    } else if (historicalMatch && historicalMatch.confidence > 0.6) {
       // Use historical match if confidence is high
       bestResult = {
         categoryId: historicalMatch.categoryId,
@@ -347,11 +482,79 @@ export class AiCategorizationService {
         },
       });
 
-      // Could implement additional learning logic here
-      // For example, updating keyword rules based on corrections
+      // Immediate learning: update feedback patterns
+      await this.updateFeedbackPatterns(description, originalCategoryId, correctedCategoryId);
+      
+      // Create or strengthen learned rules
+      await this.createLearnedRule(description, correctedCategoryId);
       
     } catch (error) {
       console.error('Error learning from correction:', error);
+    }
+  }
+
+  private async updateFeedbackPatterns(
+    description: string,
+    originalCategoryId: string,
+    correctedCategoryId: string
+  ) {
+    const keywords = this.extractKeywords(description);
+    const patternKey = keywords.slice(0, 3).join('_');
+    
+    // Find existing pattern or create new one
+    const existingPatternIndex = this.feedbackPatterns.findIndex(p => p.id === patternKey);
+    
+    if (existingPatternIndex >= 0) {
+      // Update existing pattern
+      const pattern = this.feedbackPatterns[existingPatternIndex];
+      pattern.occurrences += 1;
+      pattern.confidence = Math.min(pattern.occurrences * 0.2, 0.9);
+      pattern.lastUsed = new Date();
+    } else {
+      // Create new pattern
+      this.feedbackPatterns.push({
+        id: patternKey,
+        description,
+        originalCategoryId,
+        correctedCategoryId,
+        keywords,
+        confidence: 0.2,
+        occurrences: 1,
+        createdAt: new Date(),
+        lastUsed: new Date(),
+      });
+    }
+  }
+
+  private async createLearnedRule(description: string, categoryId: string) {
+    const keywords = this.extractKeywords(description);
+    const mainKeywords = keywords.slice(0, 2); // Use top 2 keywords
+    
+    if (mainKeywords.length === 0) return;
+    
+    // Check if similar learned rule already exists
+    const existingRule = this.categoryRules.find(rule => 
+      rule.isLearned && 
+      rule.categoryId === categoryId &&
+      rule.keywords.some(keyword => mainKeywords.includes(keyword))
+    );
+    
+    if (existingRule) {
+      // Strengthen existing rule
+      existingRule.usageCount = (existingRule.usageCount || 0) + 1;
+      existingRule.confidence = Math.min((existingRule.usageCount * 0.1) + 0.5, 0.8);
+      existingRule.lastUsed = new Date();
+    } else {
+      // Create new learned rule
+      this.categoryRules.push({
+        keywords: mainKeywords,
+        categoryId,
+        priority: 8, // Medium priority for learned rules
+        isLearned: true,
+        confidence: 0.6,
+        usageCount: 1,
+        lastUsed: new Date(),
+      });
     }
   }
 
@@ -399,6 +602,121 @@ export class AiCategorizationService {
       };
     } catch (error) {
       console.error('Error getting categorization stats:', error);
+      throw error;
+    }
+  }
+
+  // Get feedback learning insights
+  async getFeedbackInsights() {
+    try {
+      return {
+        totalPatterns: this.feedbackPatterns.length,
+        highConfidencePatterns: this.feedbackPatterns.filter(p => p.confidence > 0.7).length,
+        recentPatterns: this.feedbackPatterns.filter(p => 
+          (Date.now() - p.lastUsed.getTime()) < (30 * 24 * 60 * 60 * 1000) // Last 30 days
+        ).length,
+        learnedRules: this.categoryRules.filter(r => r.isLearned).length,
+        mostCorrectiveCategories: await this.getMostCorrectedCategories(),
+      };
+    } catch (error) {
+      console.error('Error getting feedback insights:', error);
+      return {
+        totalPatterns: 0,
+        highConfidencePatterns: 0,
+        recentPatterns: 0,
+        learnedRules: 0,
+        mostCorrectiveCategories: [],
+      };
+    }
+  }
+
+  private async getMostCorrectedCategories(limit = 5) {
+    try {
+      // Get categories that are frequently corrected
+      const corrections = await prisma.auditLog.findMany({
+        where: {
+          tableName: 'ai_categorization',
+          action: 'CORRECTION',
+          timestamp: {
+            gte: new Date(Date.now() - (90 * 24 * 60 * 60 * 1000)), // Last 90 days
+          },
+        },
+        select: {
+          oldValues: true,
+          newValues: true,
+        },
+      });
+
+      const categoryCorrections = new Map<string, { 
+        count: number; 
+        fromCategory: string; 
+        toCategory: string; 
+      }>();
+
+      for (const correction of corrections) {
+        const oldCategoryId = correction.oldValues?.categoryId;
+        const newCategoryId = correction.newValues?.categoryId;
+        
+        if (oldCategoryId && newCategoryId) {
+          const key = `${oldCategoryId}->${newCategoryId}`;
+          if (!categoryCorrections.has(key)) {
+            categoryCorrections.set(key, {
+              count: 0,
+              fromCategory: oldCategoryId,
+              toCategory: newCategoryId,
+            });
+          }
+          categoryCorrections.get(key)!.count += 1;
+        }
+      }
+
+      // Get category names
+      const categoryIds = Array.from(categoryCorrections.values())
+        .flatMap(c => [c.fromCategory, c.toCategory]);
+      
+      const categories = await prisma.category.findMany({
+        where: { id: { in: categoryIds } },
+        select: { id: true, category: true, subCategory: true },
+      });
+
+      const categoryMap = new Map(categories.map(c => [c.id, `${c.category} - ${c.subCategory}`]));
+
+      return Array.from(categoryCorrections.entries())
+        .map(([key, data]) => ({
+          correctionPattern: key,
+          count: data.count,
+          fromCategory: categoryMap.get(data.fromCategory) || 'Unknown',
+          toCategory: categoryMap.get(data.toCategory) || 'Unknown',
+        }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, limit);
+
+    } catch (error) {
+      console.error('Error getting most corrected categories:', error);
+      return [];
+    }
+  }
+
+  // Reset learned patterns (for maintenance)
+  async resetLearning(olderThanDays = 180) {
+    try {
+      const cutoffDate = new Date(Date.now() - (olderThanDays * 24 * 60 * 60 * 1000));
+      
+      // Remove old feedback patterns
+      this.feedbackPatterns = this.feedbackPatterns.filter(p => p.lastUsed > cutoffDate);
+      
+      // Remove old learned rules
+      this.categoryRules = this.categoryRules.filter(r => 
+        !r.isLearned || (r.lastUsed && r.lastUsed > cutoffDate)
+      );
+
+      return {
+        message: 'Learning patterns reset successfully',
+        remainingPatterns: this.feedbackPatterns.length,
+        remainingLearnedRules: this.categoryRules.filter(r => r.isLearned).length,
+      };
+    } catch (error) {
+      console.error('Error resetting learning:', error);
       throw error;
     }
   }
