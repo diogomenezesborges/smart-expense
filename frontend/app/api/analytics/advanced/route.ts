@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
       smartInsights,
       summaryStats
     ] = await Promise.all([
-      getCategoryInsights({ dateFrom, dateTo, categoryFilter }),
+      getCategoryInsights({ dateFrom, dateTo, ...(categoryFilter && { categoryFilter }) }),
       getMonthlyTrends({ dateFrom, dateTo }),
       getBudgetPerformance({ dateFrom, dateTo }),
       generateSmartInsights({ dateFrom, dateTo }),

@@ -105,6 +105,23 @@ describe('Advanced Analytics API', () => {
       );
     });
 
+    it('should handle missing category filter parameter correctly', async () => {
+      const url = 'http://localhost:3000/api/analytics/advanced?category=';
+      const request = new NextRequest(url);
+
+      await GET(request);
+
+      const { prisma } = await import('@/lib/database/client');
+      // When categoryFilter is empty/undefined, it should not be included in the where clause
+      expect(prisma.transaction.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.not.objectContaining({
+            categoryFilter: expect.anything()
+          })
+        })
+      );
+    });
+
     it('should use default date range when not provided', async () => {
       const url = 'http://localhost:3000/api/analytics/advanced';
       const request = new NextRequest(url);

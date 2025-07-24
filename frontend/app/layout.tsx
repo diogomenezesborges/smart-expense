@@ -49,6 +49,18 @@ export default function RootLayout({
                   </a>
                   <a
                     className="transition-colors hover:text-foreground/80 text-foreground/60"
+                    href="/goals"
+                  >
+                    Goals
+                  </a>
+                  <a
+                    className="transition-colors hover:text-foreground/80 text-foreground/60"
+                    href="/bulk-upload"
+                  >
+                    Bulk Upload
+                  </a>
+                  <a
+                    className="transition-colors hover:text-foreground/80 text-foreground/60"
                     href="/budgeting"
                   >
                     Smart Budgeting
