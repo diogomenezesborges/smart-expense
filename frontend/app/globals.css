@@ -1,51 +1,153 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
+    /* Base Theme Colors */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
+    
+    /* Primary Brand Colors - Modern Blue Theme */
+    --primary: 220 100% 50%;        /* #0051ff */
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222.2 84% 4.9%;
+    --primary-hover: 220 100% 45%;   /* #0047d4 */
+    --primary-active: 218 100% 48%;  /* #0f5ef7 */
+    
+    /* Secondary Colors */
+    --secondary: 220 14.3% 95.9%;
+    --secondary-foreground: 220.9 39.3% 11%;
+    --secondary-hover: 220 14.3% 91%;
+    --secondary-active: 220 14.3% 87%;
+    
+    /* Semantic Colors */
+    --success: 142 71% 45%;          /* #10b981 */
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;           /* #f59e0b */
+    --warning-foreground: 0 0% 100%;
+    --error: 0 72% 51%;              /* #ef4444 */
+    --error-foreground: 0 0% 100%;
+    --info: 217 91% 60%;             /* #3b82f6 */
+    --info-foreground: 0 0% 100%;
+    
+    /* UI Colors */
+    --muted: 220 14.3% 95.9%;
+    --muted-foreground: 220 8.9% 46.1%;
+    --accent: 220 14.3% 95.9%;
+    --accent-foreground: 220.9 39.3% 11%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    
+    /* Border & Input */
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 220 100% 50%;
+    
+    /* Layout */
     --radius: 0.5rem;
+    
+    /* Chart Colors */
+    --chart-1: 220 70% 50%;          /* Primary Blue */
+    --chart-2: 142 71% 45%;          /* Success Green */
+    --chart-3: 38 92% 50%;           /* Warning Orange */
+    --chart-4: 0 72% 51%;            /* Error Red */
+    --chart-5: 217 91% 60%;          /* Info Blue */
+    --chart-6: 271 81% 56%;          /* Purple */
+    --chart-7: 196 88% 48%;          /* Cyan */
+    --chart-8: 339 90% 51%;          /* Pink */
+    
+    /* Elevation Shadows */
+    --elevation-1: 0 1px 3px 0 rgb(0 0 0 / 0.12), 0 1px 2px 0 rgb(0 0 0 / 0.24);
+    --elevation-2: 0 3px 6px 0 rgb(0 0 0 / 0.16), 0 3px 6px 0 rgb(0 0 0 / 0.23);
+    --elevation-3: 0 10px 20px 0 rgb(0 0 0 / 0.19), 0 6px 6px 0 rgb(0 0 0 / 0.23);
+    --elevation-4: 0 14px 28px 0 rgb(0 0 0 / 0.25), 0 10px 10px 0 rgb(0 0 0 / 0.22);
+    --elevation-5: 0 19px 38px 0 rgb(0 0 0 / 0.30), 0 15px 12px 0 rgb(0 0 0 / 0.22);
+    
+    /* Focus States */
+    --focus-ring: 220 100% 50%;
+    --focus-ring-offset: 0 0% 100%;
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(220 100% 50%) 0%, hsl(218 100% 48%) 100%);
+    --gradient-secondary: linear-gradient(135deg, hsl(220 14.3% 95.9%) 0%, hsl(220 14.3% 91%) 100%);
+    --gradient-success: linear-gradient(135deg, hsl(142 71% 45%) 0%, hsl(142 71% 40%) 100%);
   }
 
   .dark {
+    /* Base Theme Colors - Dark Mode */
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 84% 4.9%;
-    --secondary: 217.2 32.6% 17.5%;
+    
+    /* Primary Brand Colors - Dark Mode */
+    --primary: 220 100% 60%;         /* Lighter blue for dark mode */
+    --primary-foreground: 220.9 39.3% 11%;
+    --primary-hover: 220 100% 65%;
+    --primary-active: 220 100% 55%;
+    
+    /* Secondary Colors - Dark Mode */
+    --secondary: 215 27.9% 16.9%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
+    --secondary-hover: 215 27.9% 20%;
+    --secondary-active: 215 27.9% 24%;
+    
+    /* Semantic Colors - Dark Mode */
+    --success: 142 71% 50%;          /* Slightly brighter for dark mode */
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 55%;
+    --warning-foreground: 0 0% 100%;
+    --error: 0 72% 56%;
+    --error-foreground: 0 0% 100%;
+    --info: 217 91% 65%;
+    --info-foreground: 0 0% 100%;
+    
+    /* UI Colors - Dark Mode */
+    --muted: 215 27.9% 16.9%;
+    --muted-foreground: 217.9 10.6% 64.9%;
+    --accent: 215 27.9% 16.9%;
     --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 94.1%;
+    
+    /* Border & Input - Dark Mode */
+    --border: 215 27.9% 16.9%;
+    --input: 215 27.9% 16.9%;
+    --ring: 220 100% 60%;
+    
+    /* Chart Colors - Dark Mode */
+    --chart-1: 220 70% 60%;          /* Primary Blue - brighter */
+    --chart-2: 142 71% 50%;          /* Success Green - brighter */
+    --chart-3: 38 92% 55%;           /* Warning Orange - brighter */
+    --chart-4: 0 72% 56%;            /* Error Red - brighter */
+    --chart-5: 217 91% 65%;          /* Info Blue - brighter */
+    --chart-6: 271 81% 61%;          /* Purple - brighter */
+    --chart-7: 196 88% 53%;          /* Cyan - brighter */
+    --chart-8: 339 90% 56%;          /* Pink - brighter */
+    
+    /* Elevation Shadows - Dark Mode */
+    --elevation-1: 0 1px 3px 0 rgb(0 0 0 / 0.24), 0 1px 2px 0 rgb(0 0 0 / 0.48);
+    --elevation-2: 0 3px 6px 0 rgb(0 0 0 / 0.32), 0 3px 6px 0 rgb(0 0 0 / 0.46);
+    --elevation-3: 0 10px 20px 0 rgb(0 0 0 / 0.38), 0 6px 6px 0 rgb(0 0 0 / 0.46);
+    --elevation-4: 0 14px 28px 0 rgb(0 0 0 / 0.50), 0 10px 10px 0 rgb(0 0 0 / 0.44);
+    --elevation-5: 0 19px 38px 0 rgb(0 0 0 / 0.60), 0 15px 12px 0 rgb(0 0 0 / 0.44);
+    
+    /* Focus States - Dark Mode */
+    --focus-ring: 220 100% 60%;
+    --focus-ring-offset: 222.2 84% 4.9%;
+    
+    /* Gradients - Dark Mode */
+    --gradient-primary: linear-gradient(135deg, hsl(220 100% 60%) 0%, hsl(218 100% 55%) 100%);
+    --gradient-secondary: linear-gradient(135deg, hsl(215 27.9% 16.9%) 0%, hsl(215 27.9% 20%) 100%);
+    --gradient-success: linear-gradient(135deg, hsl(142 71% 50%) 0%, hsl(142 71% 45%) 100%);
   }
 }
 
@@ -53,7 +155,142 @@
   * {
     @apply border-border;
   }
+  
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  /* Typography Scale */
+  h1 {
+    @apply text-4xl font-bold tracking-tight lg:text-5xl;
+  }
+  
+  h2 {
+    @apply text-3xl font-semibold tracking-tight;
+  }
+  
+  h3 {
+    @apply text-2xl font-semibold tracking-tight;
+  }
+  
+  h4 {
+    @apply text-xl font-semibold tracking-tight;
+  }
+  
+  h5 {
+    @apply text-lg font-medium;
+  }
+  
+  h6 {
+    @apply text-base font-medium;
+  }
+  
+  /* Focus Ring Utilities */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background;
+  }
+  
+  /* Scrollbar Styling */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground)) transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground));
+    border-radius: 3px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--foreground));
+  }
+}
+
+@layer components {
+  /* Elevation Utility Classes */
+  .elevation-1 {
+    box-shadow: var(--elevation-1);
+  }
+  
+  .elevation-2 {
+    box-shadow: var(--elevation-2);
+  }
+  
+  .elevation-3 {
+    box-shadow: var(--elevation-3);
+  }
+  
+  .elevation-4 {
+    box-shadow: var(--elevation-4);
+  }
+  
+  .elevation-5 {
+    box-shadow: var(--elevation-5);
+  }
+  
+  /* Gradient Utility Classes */
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+  
+  .gradient-secondary {
+    background: var(--gradient-secondary);
+  }
+  
+  .gradient-success {
+    background: var(--gradient-success);
+  }
+  
+  /* Animation Utility Classes */
+  .animate-in {
+    animation: fade-in 0.2s ease-out;
+  }
+  
+  .animate-out {
+    animation: fade-out 0.2s ease-out;
+  }
+  
+  /* Glass Morphism Effect */
+  .glass {
+    backdrop-filter: blur(16px) saturate(180%);
+    background-color: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+  
+  .dark .glass {
+    background-color: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  /* Container Utilities */
+  .container-content {
+    @apply mx-auto max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+  
+  .container-narrow {
+    @apply mx-auto max-w-4xl px-4 sm:px-6 lg:px-8;
+  }
+  
+  .container-wide {
+    @apply mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8;
+  }
+  
+  /* Text Utilities */
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .text-pretty {
+    text-wrap: pretty;
   }
 }

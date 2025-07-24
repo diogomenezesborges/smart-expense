@@ -85,7 +85,10 @@ export const validateEnv = () => {
   try {
     return EnvSchema.parse(process.env);
   } catch (error) {
-    console.error('❌ Invalid environment variables:', error);
+    // Import logger only when needed to avoid circular dependencies
+    import('../utils/logger').then(({ logError }) => {
+      logError('❌ Invalid environment variables:', error);
+    });
     throw new Error('Invalid environment configuration');
   }
 };
