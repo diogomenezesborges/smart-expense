@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { FeatureGate } from '@/components/feature/permissions/feature-gate';
 
 type TemplateType = 'transactions' | 'categories' | 'origins' | 'banks';
 
@@ -68,13 +69,14 @@ export default function BulkUploadPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-2xl">
-      <h1 className="text-3xl font-bold mb-2">Bulk Data Upload</h1>
-      <p className="text-gray-600 mb-8">
-        Download a template, fill it with your data, and upload it back.
-      </p>
+    <FeatureGate feature="bulk_upload">
+      <div className="container mx-auto px-4 py-8 max-w-2xl">
+        <h1 className="text-3xl font-bold mb-2">Bulk Data Upload</h1>
+        <p className="text-gray-600 mb-8">
+          Download a template, fill it with your data, and upload it back.
+        </p>
 
-      <div className="bg-white border rounded-lg p-6 space-y-6">
+        <div className="bg-white border rounded-lg p-6 space-y-6">
         {/* Step 1: Choose Type */}
         <div>
           <h2 className="text-lg font-semibold mb-3">1. Choose Data Type</h2>
@@ -136,7 +138,8 @@ export default function BulkUploadPage() {
             
           </div>
         )}
+        </div>
       </div>
-    </div>
+    </FeatureGate>
   );
 }

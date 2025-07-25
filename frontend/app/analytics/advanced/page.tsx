@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { FeatureGate } from '@/components/feature/permissions/feature-gate';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -170,7 +171,8 @@ export default function AdvancedAnalyticsPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <FeatureGate feature="advanced_charts">
+      <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
@@ -470,6 +472,7 @@ export default function AdvancedAnalyticsPage() {
           </Card>
         </div>
       )}
-    </div>
+      </div>
+    </FeatureGate>
   );
 }
