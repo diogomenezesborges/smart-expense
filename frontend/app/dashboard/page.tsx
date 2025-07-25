@@ -4,10 +4,12 @@ import { useState, useEffect } from 'react';
 import { SummaryCards } from '@/components/feature/dashboard/summary-cards';
 import { TransactionList } from '@/components/feature/dashboard/transaction-list';
 import { CategoryBreakdown } from '@/components/feature/dashboard/category-breakdown';
+import { SpendingTrends } from '@/components/feature/dashboard/spending-trends';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { 
   RefreshCw, 
   Eye, 
@@ -195,26 +197,42 @@ export default function DashboardPage() {
           <CardDescription>AI-powered financial recommendations and alerts</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
             {insights.map((insight, index) => (
-              <div key={index} className="flex items-start space-x-3 p-3 bg-muted/50 rounded-lg">
+              <Alert 
+                key={index} 
+                variant={
+                  insight.type === 'success' ? 'success' :
+                  insight.type === 'warning' ? 'warning' :
+                  insight.type === 'error' ? 'destructive' : 'info'
+                }
+                className="transition-all duration-200 hover:shadow-sm"
+              >
                 {getInsightIcon(insight.type)}
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-medium text-sm">{insight.title}</h4>
-                  <p className="text-sm text-muted-foreground mt-1">{insight.description}</p>
+                <div className="ml-2">
+                  <AlertTitle className="text-sm font-medium">{insight.title}</AlertTitle>
+                  <AlertDescription className="text-sm mt-1">
+                    {insight.description}
+                  </AlertDescription>
                   {insight.action && insight.actionUrl && (
-                    <Link href={insight.actionUrl}>
-                      <Button variant="link" size="sm" className="p-0 h-auto mt-2">
-                        {insight.action} →
-                      </Button>
-                    </Link>
+                    <div className="mt-3">
+                      <Link href={insight.actionUrl}>
+                        <Button variant="outline" size="sm" className="h-8 text-xs">
+                          {insight.action}
+                          <ArrowUpRight className="h-3 w-3 ml-1" />
+                        </Button>
+                      </Link>
+                    </div>
                   )}
                 </div>
-              </div>
+              </Alert>
             ))}
           </div>
         </CardContent>
       </Card>
+      
+      {/* Spending Trends Section */}
+      <SpendingTrends />
       
       {/* Main Content Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">

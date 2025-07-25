@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { TrendingUp, TrendingDown, DollarSign, CreditCard, PiggyBank, Activity } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
 interface SummaryData {
@@ -13,6 +16,12 @@ interface SummaryData {
     income: number;
     expenses: number;
     net: number;
+  };
+  trends?: {
+    income: { value: number; direction: 'up' | 'down' | 'stable' };
+    expenses: { value: number; direction: 'up' | 'down' | 'stable' };
+    net: { value: number; direction: 'up' | 'down' | 'stable' };
+    transactions: { value: number; direction: 'up' | 'down' | 'stable' };
   };
 }
 
@@ -40,17 +49,30 @@ export function SummaryCards() {
     fetchSummary();
   }, []);
 
+  const getTrendIcon = (direction: 'up' | 'down' | 'stable') => {
+    switch (direction) {
+      case 'up': return <TrendingUp className="h-4 w-4 text-success" />;
+      case 'down': return <TrendingDown className="h-4 w-4 text-error" />;
+      default: return <Activity className="h-4 w-4 text-muted-foreground" />;
+    }
+  };
+
+  const getTrendColor = (direction: 'up' | 'down' | 'stable', isPositive: boolean = true) => {
+    if (direction === 'stable') return 'text-muted-foreground';
+    const isGood = isPositive ? direction === 'up' : direction === 'down';
+    return isGood ? 'text-success' : 'text-error';
+  };
+
   if (loading) {
     return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {[...Array(4)].map((_, i) => (
-          <Card key={i}>
+          <Card key={i} className="animate-pulse">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Loading...</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">--</div>
-              <p className="text-xs text-muted-foreground">--</p>
+              <LoadingSpinner size="sm" />
             </CardContent>
           </Card>
         ))}
@@ -72,109 +94,128 @@ export function SummaryCards() {
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      <Card>
+      {/* Total Income Card */}
+      <Card className="hover:shadow-md transition-all duration-200 border-l-4 border-l-success">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Total Income</CardTitle>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            className="h-4 w-4 text-green-600"
-          >
-            <path d="M12 2v20m5-5l-5 5-5-5" />
-          </svg>
+          <div className="p-2 bg-success/10 rounded-full">
+            <DollarSign className="h-4 w-4 text-success" />
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-green-600">
+          <div className="text-2xl font-bold text-success animate-in fade-in-50 duration-500">
             {formatCurrency(summary.totalIncome)}
           </div>
-          <p className="text-xs text-muted-foreground">
-            This month: {formatCurrency(summary.thisMonth.income)}
-          </p>
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-xs text-muted-foreground">
+              This month: {formatCurrency(summary.thisMonth.income)}
+            </p>
+            {summary.trends?.income && (
+              <div className="flex items-center space-x-1">
+                {getTrendIcon(summary.trends.income.direction)}
+                <span className={`text-xs font-medium ${getTrendColor(summary.trends.income.direction, true)}`}>
+                  {summary.trends.income.value.toFixed(1)}%
+                </span>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
-      <Card>
+      {/* Total Expenses Card */}
+      <Card className="hover:shadow-md transition-all duration-200 border-l-4 border-l-error">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            className="h-4 w-4 text-red-600"
-          >
-            <path d="M12 2v20m5-5l-5 5-5-5" />
-          </svg>
+          <div className="p-2 bg-error/10 rounded-full">
+            <CreditCard className="h-4 w-4 text-error" />
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-red-600">
+          <div className="text-2xl font-bold text-error animate-in fade-in-50 duration-500">
             {formatCurrency(summary.totalExpenses)}
           </div>
-          <p className="text-xs text-muted-foreground">
-            This month: {formatCurrency(summary.thisMonth.expenses)}
-          </p>
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-xs text-muted-foreground">
+              This month: {formatCurrency(summary.thisMonth.expenses)}
+            </p>
+            {summary.trends?.expenses && (
+              <div className="flex items-center space-x-1">
+                {getTrendIcon(summary.trends.expenses.direction)}
+                <span className={`text-xs font-medium ${getTrendColor(summary.trends.expenses.direction, false)}`}>
+                  {summary.trends.expenses.value.toFixed(1)}%
+                </span>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
-      <Card>
+      {/* Net Amount Card */}
+      <Card className={`hover:shadow-md transition-all duration-200 border-l-4 ${
+        summary.netAmount >= 0 ? 'border-l-success' : 'border-l-warning'
+      }`}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Net Amount</CardTitle>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            className="h-4 w-4 text-muted-foreground"
-          >
-            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-            <circle cx="9" cy="7" r="4" />
-            <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-          </svg>
+          <div className={`p-2 rounded-full ${
+            summary.netAmount >= 0 ? 'bg-success/10' : 'bg-warning/10'
+          }`}>
+            <PiggyBank className={`h-4 w-4 ${
+              summary.netAmount >= 0 ? 'text-success' : 'text-warning'
+            }`} />
+          </div>
         </CardHeader>
         <CardContent>
-          <div className={`text-2xl font-bold ${
-            summary.netAmount >= 0 ? 'text-green-600' : 'text-red-600'
+          <div className={`text-2xl font-bold animate-in fade-in-50 duration-500 ${
+            summary.netAmount >= 0 ? 'text-success' : 'text-warning'
           }`}>
             {formatCurrency(summary.netAmount)}
           </div>
-          <p className="text-xs text-muted-foreground">
-            This month: {formatCurrency(summary.thisMonth.net)}
-          </p>
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-xs text-muted-foreground">
+              This month: {formatCurrency(summary.thisMonth.net)}
+            </p>
+            {summary.trends?.net && (
+              <div className="flex items-center space-x-1">
+                {getTrendIcon(summary.trends.net.direction)}
+                <span className={`text-xs font-medium ${getTrendColor(summary.trends.net.direction, true)}`}>
+                  {summary.trends.net.value.toFixed(1)}%
+                </span>
+              </div>
+            )}
+          </div>
+          {summary.netAmount >= 0 && (
+            <Badge variant="secondary" className="mt-2 text-xs">
+              Savings Goal: {((summary.netAmount / (summary.totalIncome || 1)) * 100).toFixed(1)}%
+            </Badge>
+          )}
         </CardContent>
       </Card>
 
-      <Card>
+      {/* Total Transactions Card */}
+      <Card className="hover:shadow-md transition-all duration-200 border-l-4 border-l-primary">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Total Transactions</CardTitle>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            className="h-4 w-4 text-muted-foreground"
-          >
-            <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-          </svg>
+          <div className="p-2 bg-primary/10 rounded-full">
+            <Activity className="h-4 w-4 text-primary" />
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{summary.transactionCount}</div>
-          <p className="text-xs text-muted-foreground">
-            All tracked transactions
-          </p>
+          <div className="text-2xl font-bold text-primary animate-in fade-in-50 duration-500">
+            {summary.transactionCount.toLocaleString()}
+          </div>
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-xs text-muted-foreground">
+              All tracked transactions
+            </p>
+            {summary.trends?.transactions && (
+              <div className="flex items-center space-x-1">
+                {getTrendIcon(summary.trends.transactions.direction)}
+                <span className={`text-xs font-medium ${getTrendColor(summary.trends.transactions.direction, true)}`}>
+                  {summary.trends.transactions.value.toFixed(1)}%
+                </span>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>
