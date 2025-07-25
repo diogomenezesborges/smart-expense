@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "kindergarden": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "@composio/mcp@latest",
+        "start",
+        "--url",
+        "https://mcp.composio.dev/composio/server/f1047202-858a-42eb-bfb7-c186397035fa?transport=sse"
+      ],
+      "env": {
+        "npm_config_yes": "true"
+      }
+    }
+  }
+}

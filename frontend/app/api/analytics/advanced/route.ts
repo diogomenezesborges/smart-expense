@@ -201,7 +201,7 @@ async function getCategoryInsights(params: AdvancedAnalyticsParams): Promise<Cat
   });
 
   const totalAmount = categoryData.reduce((sum, item) => 
-    sum + (item._sum.incomes || 0) + (item._sum.outgoings || 0), 0
+    sum + Number(item._sum.incomes || 0) + Number(item._sum.outgoings || 0), 0
   );
 
   // Get previous period data for trend analysis
@@ -212,7 +212,7 @@ async function getCategoryInsights(params: AdvancedAnalyticsParams): Promise<Cat
         gte: new Date(dateFrom.getTime() - (dateTo.getTime() - dateFrom.getTime())),
         lt: dateFrom
       },
-      categoryId: categoryFilter ? categoryFilter : undefined
+      ...(categoryFilter && { categoryId: categoryFilter })
     },
     _sum: {
       incomes: true,
@@ -223,13 +223,13 @@ async function getCategoryInsights(params: AdvancedAnalyticsParams): Promise<Cat
   const previousPeriodMap = new Map(
     previousPeriodData.map(item => [
       item.categoryId, 
-      (item._sum.incomes || 0) + (item._sum.outgoings || 0)
+      Number(item._sum.incomes || 0) + Number(item._sum.outgoings || 0)
     ])
   );
 
   return categoryData.map(item => {
     const category = categories.find(c => c.id === item.categoryId);
-    const currentAmount = (item._sum.incomes || 0) + (item._sum.outgoings || 0);
+    const currentAmount = Number(item._sum.incomes || 0) + Number(item._sum.outgoings || 0);
     const previousAmount = previousPeriodMap.get(item.categoryId) || 0;
     
     let trend: 'increasing' | 'decreasing' | 'stable' = 'stable';
