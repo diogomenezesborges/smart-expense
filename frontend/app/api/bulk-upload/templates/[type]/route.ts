@@ -39,7 +39,8 @@ export async function GET(
     return NextResponse.json(
       { 
         success: false, 
-        error: 'Failed to generate template' 
+        error: 'Failed to generate template',
+        details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
     );
