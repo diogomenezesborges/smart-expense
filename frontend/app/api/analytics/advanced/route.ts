@@ -146,13 +146,13 @@ async function getSummaryStatistics(params: AdvancedAnalyticsParams) {
     })
   ]);
 
-  const totalIncome = totalStats._sum.incomes || 0;
-  const totalExpenses = totalStats._sum.outgoings || 0;
+  const totalIncome = Number(totalStats._sum.incomes || 0);
+  const totalExpenses = Number(totalStats._sum.outgoings || 0);
   const netFlow = totalIncome - totalExpenses;
   const savingsRate = totalIncome > 0 ? (netFlow / totalIncome) * 100 : 0;
 
-  const previousIncome = previousPeriodStats._sum.incomes || 0;
-  const previousExpenses = previousPeriodStats._sum.outgoings || 0;
+  const previousIncome = Number(previousPeriodStats._sum.incomes || 0);
+  const previousExpenses = Number(previousPeriodStats._sum.outgoings || 0);
 
   const incomeChange = previousIncome > 0 ? ((totalIncome - previousIncome) / previousIncome) * 100 : 0;
   const expenseChange = previousExpenses > 0 ? ((totalExpenses - previousExpenses) / previousExpenses) * 100 : 0;
@@ -181,7 +181,7 @@ async function getCategoryInsights(params: AdvancedAnalyticsParams): Promise<Cat
     by: ['categoryId'],
     where: {
       date: { gte: dateFrom, lte: dateTo },
-      categoryId: categoryFilter ? categoryFilter : undefined
+      ...(categoryFilter && { categoryId: categoryFilter })
     },
     _sum: {
       incomes: true,

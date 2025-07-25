@@ -20,6 +20,17 @@ const config: Config = {
       fontFamily: {
         sans: ['DM Sans', 'system-ui', 'sans-serif'],
       },
+      fontWeight: {
+        'thin': '100',
+        'extralight': '200',
+        'light': '300',
+        'normal': '400',
+        'medium': '500',
+        'semibold': '600',
+        'bold': '700',
+        'extrabold': '800',
+        'black': '900',
+      },
       fontSize: {
         'xs': ['0.75rem', { lineHeight: '1rem' }],        // 12px
         'sm': ['0.875rem', { lineHeight: '1.25rem' }],    // 14px
@@ -41,16 +52,16 @@ const config: Config = {
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         primary: {
-          DEFAULT: 'hsl(var(--primary))',
+          DEFAULT: '#0051ff',
           foreground: 'hsl(var(--primary-foreground))',
           50: '#eff6ff',
-          100: '#dbeafe',
+          100: '#dbeafe', 
           200: '#bfdbfe',
           300: '#93c5fd',
           400: '#60a5fa',
-          500: '#0051ff',
-          600: '#0047d4',
-          700: '#0f5ef7',
+          500: '#0051ff',    // Main brand color
+          600: '#0047d4',    // Hover state
+          700: '#0f5ef7',    // Active state  
           800: '#1e40af',
           900: '#1e3a8a',
           950: '#172554',
@@ -130,39 +141,42 @@ const config: Config = {
         },
       },
       spacing: {
-        '0.5': '0.125rem',    // 2px
-        '1': '0.25rem',       // 4px
+        // 8px Base Grid System
+        '0': '0rem',          // 0px
+        '0.5': '0.125rem',    // 2px (quarter of base)
+        '1': '0.25rem',       // 4px (half of base)
         '1.5': '0.375rem',    // 6px
-        '2': '0.5rem',        // 8px
+        '2': '0.5rem',        // 8px (1x base unit)
         '2.5': '0.625rem',    // 10px
         '3': '0.75rem',       // 12px
         '3.5': '0.875rem',    // 14px
-        '4': '1rem',          // 16px
+        '4': '1rem',          // 16px (2x base unit)
         '5': '1.25rem',       // 20px
-        '6': '1.5rem',        // 24px
+        '6': '1.5rem',        // 24px (3x base unit)
         '7': '1.75rem',       // 28px
-        '8': '2rem',          // 32px
+        '8': '2rem',          // 32px (4x base unit)
         '9': '2.25rem',       // 36px
-        '10': '2.5rem',       // 40px
+        '10': '2.5rem',       // 40px (5x base unit)
         '11': '2.75rem',      // 44px
-        '12': '3rem',         // 48px
-        '14': '3.5rem',       // 56px
-        '16': '4rem',         // 64px
-        '20': '5rem',         // 80px
-        '24': '6rem',         // 96px
-        '28': '7rem',         // 112px
-        '32': '8rem',         // 128px
-        '36': '9rem',         // 144px
-        '40': '10rem',        // 160px
-        '44': '11rem',        // 176px
-        '48': '12rem',        // 192px
-        '52': '13rem',        // 208px
-        '56': '14rem',        // 224px
-        '60': '15rem',        // 240px
-        '64': '16rem',        // 256px
-        '72': '18rem',        // 288px
-        '80': '20rem',        // 320px
-        '96': '24rem',        // 384px
+        '12': '3rem',         // 48px (6x base unit)
+        '14': '3.5rem',       // 56px (7x base unit)
+        '16': '4rem',         // 64px (8x base unit)
+        '18': '4.5rem',       // 72px (9x base unit)
+        '20': '5rem',         // 80px (10x base unit)
+        '24': '6rem',         // 96px (12x base unit)
+        '28': '7rem',         // 112px (14x base unit)
+        '32': '8rem',         // 128px (16x base unit)
+        '36': '9rem',         // 144px (18x base unit)
+        '40': '10rem',        // 160px (20x base unit)
+        '44': '11rem',        // 176px (22x base unit)
+        '48': '12rem',        // 192px (24x base unit)
+        '52': '13rem',        // 208px (26x base unit)
+        '56': '14rem',        // 224px (28x base unit)
+        '60': '15rem',        // 240px (30x base unit)
+        '64': '16rem',        // 256px (32x base unit)
+        '72': '18rem',        // 288px (36x base unit)
+        '80': '20rem',        // 320px (40x base unit)
+        '96': '24rem',        // 384px (48x base unit)
       },
       borderRadius: {
         'none': '0',
