@@ -281,11 +281,16 @@ export default function TransactionsPage() {
       ]);
 
       setTransactions(transactionsData.transactions || []);
-      setCategories(categoriesData.data || []);
-      setOrigins(originsData.data || []);
-      setBanks(banksData.data || []);
+      setCategories(Array.isArray(categoriesData.data) ? categoriesData.data : []);
+      setOrigins(Array.isArray(originsData.data) ? originsData.data : []);
+      setBanks(Array.isArray(banksData.data) ? banksData.data : []);
     } catch (error) {
       console.error('Error fetching data:', error);
+      // Set fallback empty arrays to prevent map errors
+      setCategories([]);
+      setOrigins([]);
+      setBanks([]);
+      setTransactions([]);
     } finally {
       setLoading(false);
     }
@@ -581,7 +586,7 @@ export default function TransactionsPage() {
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">Categories</Label>
                     <div className="max-h-48 overflow-y-auto space-y-2 border rounded-md p-3">
-                      {categories.map((category) => (
+                      {Array.isArray(categories) && categories.map((category) => (
                         <div key={category.id} className="flex items-center space-x-2">
                           <Checkbox
                             id={`category-${category.id}`}
@@ -600,7 +605,7 @@ export default function TransactionsPage() {
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">Origins</Label>
                     <div className="max-h-48 overflow-y-auto space-y-2 border rounded-md p-3">
-                      {origins.map((origin) => (
+                      {Array.isArray(origins) && origins.map((origin) => (
                         <div key={origin.id} className="flex items-center space-x-2">
                           <Checkbox
                             id={`origin-${origin.id}`}
@@ -618,7 +623,7 @@ export default function TransactionsPage() {
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">Banks</Label>
                     <div className="max-h-48 overflow-y-auto space-y-2 border rounded-md p-3">
-                      {banks.map((bank) => (
+                      {Array.isArray(banks) && banks.map((bank) => (
                         <div key={bank.id} className="flex items-center space-x-2">
                           <Checkbox
                             id={`bank-${bank.id}`}
@@ -759,10 +764,10 @@ export default function TransactionsPage() {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="cursor-pointer hover:bg-muted/50" 
+                  className="cursor-pointer hover:bg-muted/50 text-right min-w-[120px]" 
                   onClick={() => handleSort('amount')}
                 >
-                  <div className="flex items-center space-x-1">
+                  <div className="flex items-center justify-end space-x-1">
                     <DollarSign className="h-4 w-4" />
                     <span>Amount</span>
                     {getSortIcon('amount')}
@@ -773,10 +778,10 @@ export default function TransactionsPage() {
                 <TableHead>Bank</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead 
-                  className="cursor-pointer hover:bg-muted/50" 
+                  className="cursor-pointer hover:bg-muted/50 text-center" 
                   onClick={() => handleSort('aiConfidence')}
                 >
-                  <div className="flex items-center space-x-1">
+                  <div className="flex items-center justify-center space-x-1">
                     <span>AI Score</span>
                     {getSortIcon('aiConfidence')}
                   </div>
@@ -806,15 +811,16 @@ export default function TransactionsPage() {
                     )}
                   </TableCell>
                   
-                  <TableCell>
+                  <TableCell className="min-w-[120px]">
                     {editingId === transaction.id ? (
-                      <div className="space-y-1">
+                      <div className="flex flex-col space-y-1 min-w-[100px]">
                         <Input
                           type="number"
                           step="0.01"
                           placeholder="Income"
                           value={editData.incomes?.toString() || ''}
                           onChange={(e) => setEditData({ ...editData, incomes: e.target.value ? parseFloat(e.target.value) : null })}
+                          className="h-8 text-xs"
                         />
                         <Input
                           type="number"
@@ -822,10 +828,11 @@ export default function TransactionsPage() {
                           placeholder="Expense"
                           value={editData.outgoings?.toString() || ''}
                           onChange={(e) => setEditData({ ...editData, outgoings: e.target.value ? parseFloat(e.target.value) : null })}
+                          className="h-8 text-xs"
                         />
                       </div>
                     ) : (
-                      <div className={`font-semibold ${
+                      <div className={`font-semibold text-right ${
                         transaction.flow === 'ENTRADA' ? 'text-green-600' : 'text-red-600'
                       }`}>
                         {transaction.flow === 'ENTRADA' ? '+' : '-'}
@@ -907,8 +914,8 @@ export default function TransactionsPage() {
                     )}
                   </TableCell>
                   
-                  <TableCell>
-                    <div className="text-center">
+                  <TableCell className="text-center">
+                    <div className="font-medium">
                       {Math.round(transaction.aiConfidence * 100)}%
                     </div>
                   </TableCell>

@@ -5,6 +5,8 @@ import { SummaryCards } from '@/components/feature/dashboard/summary-cards';
 import { TransactionList } from '@/components/feature/dashboard/transaction-list';
 import { CategoryBreakdown } from '@/components/feature/dashboard/category-breakdown';
 import { SpendingTrends } from '@/components/feature/dashboard/spending-trends';
+import { FinancialHealthScore } from '@/components/feature/dashboard/financial-health-score';
+import { SpendingPatterns } from '@/components/feature/dashboard/spending-patterns';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -231,8 +233,17 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
       
-      {/* Spending Trends Section */}
-      <SpendingTrends />
+      {/* Enhanced Analytics Grid */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* Financial Health Score */}
+        <FinancialHealthScore />
+        
+        {/* Spending Patterns */}
+        <SpendingPatterns />
+        
+        {/* Spending Trends */}
+        <SpendingTrends className="md:col-span-2 lg:col-span-1" />
+      </div>
       
       {/* Main Content Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">

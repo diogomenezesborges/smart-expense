@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect } from 'react';
 import { FeatureKey, UserPermissions } from '@/lib/types/permissions';
 import { PermissionsService } from '@/lib/services/permissions-service';

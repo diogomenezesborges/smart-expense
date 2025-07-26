@@ -15,18 +15,12 @@ import {
   Target,
   TrendingUp,
   TrendingDown,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
   RefreshCw,
   Eye,
   EyeOff,
-  Bell,
   Settings,
   PlusCircle,
   BarChart3,
-  PieChart,
-  Calendar,
   Wallet,
   Home,
   Car,
@@ -34,7 +28,7 @@ import {
   Coffee,
   Briefcase,
   ArrowRight,
-  ChevronRight
+  ChevronRight,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -64,16 +58,7 @@ interface RecentTransaction {
   date: string;
   type: 'income' | 'expense';
   icon: React.ReactNode;
-}
-
-interface SmartInsight {
-  id: string;
-  type: 'success' | 'warning' | 'info' | 'error';
-  title: string;
-  description: string;
-  action?: string;
-  actionUrl?: string;
-  priority: 'high' | 'medium' | 'low';
+  responsiblePerson: 'Diogo' | 'Joana' | 'Comum';
 }
 
 interface BudgetOverview {
@@ -85,10 +70,12 @@ interface BudgetOverview {
 }
 
 export default function HomePage() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(new Date());
   const [balanceVisible, setBalanceVisible] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [currentUser] = useState<'Diogo' | 'Joana' | 'Comum'>('Diogo'); // This would come from auth context
+  const [activeTimeframe, setActiveTimeframe] = useState<'7d' | '30d' | '3m'>('30d');
 
   // Mock data - in real app this would come from APIs
   const [financialSummary, setFinancialSummary] = useState<FinancialSummary>({
@@ -143,7 +130,8 @@ export default function HomePage() {
       category: 'Income',
       date: '2024-01-20',
       type: 'income',
-      icon: <Briefcase className="h-4 w-4" />
+      icon: <Briefcase className="h-4 w-4" />,
+      responsiblePerson: 'Diogo'
     },
     {
       id: '2',
@@ -152,7 +140,8 @@ export default function HomePage() {
       category: 'Groceries',
       date: '2024-01-19',
       type: 'expense',
-      icon: <ShoppingCart className="h-4 w-4" />
+      icon: <ShoppingCart className="h-4 w-4" />,
+      responsiblePerson: 'Comum'
     },
     {
       id: '3',
@@ -161,7 +150,8 @@ export default function HomePage() {
       category: 'Food & Dining',
       date: '2024-01-19',
       type: 'expense',
-      icon: <Coffee className="h-4 w-4" />
+      icon: <Coffee className="h-4 w-4" />,
+      responsiblePerson: 'Joana'
     },
     {
       id: '4',
@@ -170,7 +160,8 @@ export default function HomePage() {
       category: 'Transportation',
       date: '2024-01-18',
       type: 'expense',
-      icon: <Car className="h-4 w-4" />
+      icon: <Car className="h-4 w-4" />,
+      responsiblePerson: 'Diogo'
     },
     {
       id: '5',
@@ -179,37 +170,8 @@ export default function HomePage() {
       category: 'Bills',
       date: '2024-01-17',
       type: 'expense',
-      icon: <Home className="h-4 w-4" />
-    }
-  ];
-
-  const smartInsights: SmartInsight[] = [
-    {
-      id: '1',
-      type: 'success',
-      title: 'Great Savings Month!',
-      description: 'You\'ve saved 22.7% of your income this month, exceeding your 20% goal.',
-      action: 'View Savings Plan',
-      actionUrl: '/goals',
-      priority: 'high'
-    },
-    {
-      id: '2',
-      type: 'warning',
-      title: 'Transportation Budget Alert',
-      description: 'You\'re at 94% of your transportation budget with 8 days remaining.',
-      action: 'Review Expenses',
-      actionUrl: '/transactions?category=transportation',
-      priority: 'high'
-    },
-    {
-      id: '3',
-      type: 'info',
-      title: 'Spending Pattern Detected',
-      description: 'You spend 15% more on weekends. Consider setting weekend budgets.',
-      action: 'Create Weekend Budget',
-      actionUrl: '/budgeting/new',
-      priority: 'medium'
+      icon: <Home className="h-4 w-4" />,
+      responsiblePerson: 'Comum'
     }
   ];
 
@@ -244,33 +206,18 @@ export default function HomePage() {
     }
   ];
 
-  useEffect(() => {
-    // Simulate initial data loading
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-      setLastUpdated(new Date());
-    }, 1500);
+  // Disable auto-refresh for better performance - can be enabled later if needed
+  // useEffect(() => {
+  //   if (!autoRefresh) return;
+  //   const interval = setInterval(() => {
+  //     setLastUpdated(new Date());
+  //   }, 30000);
+  //   return () => clearInterval(interval);
+  // }, [autoRefresh]);
 
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    if (!autoRefresh) return;
-
-    const interval = setInterval(() => {
-      // Simulate data refresh
-      setLastUpdated(new Date());
-    }, 30000); // Refresh every 30 seconds
-
-    return () => clearInterval(interval);
-  }, [autoRefresh]);
-
-  const refreshData = async () => {
-    setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+  const refreshData = () => {
     setLastUpdated(new Date());
-    setIsLoading(false);
+    // No loading state needed for instant refresh
   };
 
   const formatCurrency = (amount: number) => {
@@ -280,18 +227,18 @@ export default function HomePage() {
     }).format(amount);
   };
 
-  const getInsightIcon = (type: string) => {
-    switch (type) {
-      case 'success': return <CheckCircle className="h-4 w-4 text-success" />;
-      case 'warning': return <AlertTriangle className="h-4 w-4 text-warning" />;
-      case 'error': return <AlertTriangle className="h-4 w-4 text-error" />;
-      default: return <Clock className="h-4 w-4 text-info" />;
+  const getPersonBadgeColor = (person: string) => {
+    switch (person) {
+      case 'Diogo': return 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md border-0';
+      case 'Joana': return 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md border-0';
+      case 'Comum': return 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md border-0';
+      default: return 'bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow-md border-0';
     }
   };
 
   if (isLoading) {
     return (
-      <div className="flex-1 space-y-6 p-8 pt-6">
+      <div className="flex-1 space-y-6 p-8 pt-6 max-w-7xl mx-auto">
         <div className="flex items-center justify-between">
           <div className="space-y-2">
             <Skeleton className="h-8 w-48" />
@@ -300,285 +247,100 @@ export default function HomePage() {
           <Skeleton className="h-10 w-32" />
         </div>
         
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-4 w-4" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-32 mb-2" />
-                <Skeleton className="h-3 w-20" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-          <Card className="col-span-4">
-            <CardHeader>
-              <Skeleton className="h-6 w-40" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="flex items-center space-x-4">
-                  <Skeleton className="h-10 w-10 rounded-full" />
-                  <div className="space-y-2 flex-1">
-                    <Skeleton className="h-4 w-48" />
-                    <Skeleton className="h-3 w-24" />
-                  </div>
-                  <Skeleton className="h-4 w-16" />
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-          <Card className="col-span-3">
-            <CardHeader>
-              <Skeleton className="h-6 w-32" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="space-y-2">
-                  <div className="flex justify-between">
-                    <Skeleton className="h-4 w-20" />
-                    <Skeleton className="h-4 w-16" />
-                  </div>
-                  <Skeleton className="h-2 w-full" />
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+        <div className="grid gap-6 lg:grid-cols-12">
+          <div className="lg:col-span-8 space-y-6">
+            <Skeleton className="h-48 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+          <div className="lg:col-span-4">
+            <Skeleton className="h-96 w-full" />
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 space-y-6 p-8 pt-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Welcome back! 👋</h1>
-          <p className="text-muted-foreground mt-1">
-            Here's what's happening with your finances today.
-            {lastUpdated && (
-              <span className="ml-2 text-xs">
-                Last updated: {lastUpdated.toLocaleTimeString()}
-              </span>
-            )}
-          </p>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setAutoRefresh(!autoRefresh)}
-          >
-            {autoRefresh ? (
-              <>
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                Auto-refresh On
-              </>
-            ) : (
-              <>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Auto-refresh Off
-              </>
-            )}
-          </Button>
-          <Button variant="outline" onClick={refreshData} disabled={isLoading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        </div>
-      </div>
-
-      {/* Financial Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Balance</CardTitle>
-            <div className="flex items-center space-x-1">
+    <div className="space-y-6 p-6 max-w-6xl mx-auto">
+      {/* Top Row - Account Balance and Expenses (Like Imagem1.png) */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Account Balance Widget - Blue card like in image */}
+        <Card className="bg-primary text-primary-foreground shadow-lg">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-primary-foreground/80">Account Balance</CardTitle>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setBalanceVisible(!balanceVisible)}
-                className="h-6 w-6 p-0"
+                className="h-6 w-6 p-0 text-primary-foreground hover:bg-primary-foreground/20"
               >
                 {balanceVisible ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
               </Button>
-              <Wallet className="h-4 w-4 text-muted-foreground" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {balanceVisible ? formatCurrency(financialSummary.totalBalance) : '••••••'}
+            <div className="text-3xl font-bold mb-1">
+              {balanceVisible ? formatCurrency(financialSummary.totalBalance) : '••••••••'}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Across all accounts
-            </p>
+            <div className="flex items-center text-primary-foreground/80 text-sm">
+              <ArrowUpRight className="h-4 w-4 mr-1" />
+              <span>+2.5% from last month</span>
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monthly Income</CardTitle>
-            <TrendingUp className="h-4 w-4 text-success" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-success">
-              {formatCurrency(financialSummary.monthlyIncome)}
+        {/* Expenses Widget - Like in image */}
+        <Card className="shadow-lg">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Expenses</CardTitle>
+              <ArrowUpRight className="h-4 w-4" />
             </div>
-            <p className="text-xs text-muted-foreground">
-              <ArrowUpRight className="inline h-3 w-3 mr-1" />
-              +12% from last month
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monthly Expenses</CardTitle>
-            <TrendingDown className="h-4 w-4 text-error" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-error">
+            <div className="text-3xl font-bold mb-1 text-black">
               {formatCurrency(financialSummary.monthlyExpenses)}
             </div>
-            <p className="text-xs text-muted-foreground">
-              <ArrowDownRight className="inline h-3 w-3 mr-1" />
-              -5% from last month
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Savings Rate</CardTitle>
-            <Target className="h-4 w-4 text-info" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-info">
-              {financialSummary.savingsRate}%
+            <div className="flex items-center text-muted-foreground text-sm">
+              <ArrowDownRight className="h-4 w-4 mr-1 text-red-500" />
+              <span>-5.2% from last month</span>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Goal: 20% • <span className="text-success">Exceeding target!</span>
-            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Smart Insights */}
-      {smartInsights.length > 0 && (
-        <Card>
+      {/* Quick Actions and Budget Overview - 2x2 layout as originally requested */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Quick Actions - Left side, 2x2 matrix */}
+        <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <Bell className="h-5 w-5 mr-2" />
-              Smart Insights
-            </CardTitle>
-            <CardDescription>
-              AI-powered recommendations based on your spending patterns
-            </CardDescription>
+            <CardTitle>Quick Actions</CardTitle>
+            <CardDescription>Frequently used features for faster access</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {smartInsights.map((insight) => (
-                <div key={insight.id} className="flex items-start space-x-3 p-3 bg-muted/50 rounded-lg">
-                  {getInsightIcon(insight.type)}
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-sm">{insight.title}</h4>
-                    <p className="text-sm text-muted-foreground mt-1">{insight.description}</p>
-                    {insight.action && insight.actionUrl && (
-                      <Link href={insight.actionUrl}>
-                        <Button variant="link" size="sm" className="p-0 h-auto mt-2">
-                          {insight.action} <ArrowRight className="h-3 w-3 ml-1" />
-                        </Button>
-                      </Link>
-                    )}
-                  </div>
-                  <Badge variant={insight.priority === 'high' ? 'default' : 'secondary'}>
-                    {insight.priority}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Frequently used features for faster access</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {quickActions.map((action) => (
-              <Link key={action.id} href={action.href}>
-                <div className="group p-4 rounded-lg border hover:shadow-md transition-all cursor-pointer hover:border-primary/50">
-                  <div className="flex items-center space-x-3">
-                    <div className={`p-2 rounded-lg ${action.color} text-white group-hover:scale-110 transition-transform`}>
-                      {action.icon}
+            <div className="grid gap-4 grid-cols-2">
+              {quickActions.map((action) => (
+                <Link key={action.id} href={action.href}>
+                  <div className="group p-4 rounded-lg border hover:shadow-md transition-all cursor-pointer hover:border-primary/50">
+                    <div className="flex flex-col items-center text-center space-y-2">
+                      <div className={`p-3 rounded-lg ${action.color} text-white group-hover:scale-110 transition-transform`}>
+                        {action.icon}
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-sm">{action.title}</h4>
+                        <p className="text-xs text-muted-foreground mt-1">{action.description}</p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-sm">{action.title}</h4>
-                      <p className="text-xs text-muted-foreground mt-1">{action.description}</p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                   </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Main Content Grid */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
-        {/* Recent Transactions */}
-        <Card className="col-span-4">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Recent Transactions</CardTitle>
-              <CardDescription>Your latest financial activity</CardDescription>
-            </div>
-            <Link href="/transactions">
-              <Button variant="outline" size="sm">
-                View All <ArrowRight className="h-3 w-3 ml-1" />
-              </Button>
-            </Link>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {recentTransactions.map((transaction) => (
-                <div key={transaction.id} className="flex items-center space-x-4">
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className={transaction.type === 'income' ? 'bg-success/10' : 'bg-muted'}>
-                      {transaction.icon}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{transaction.description}</p>
-                    <p className="text-xs text-muted-foreground">{transaction.category}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className={`text-sm font-medium ${
-                      transaction.type === 'income' ? 'text-success' : 'text-foreground'
-                    }`}>
-                      {transaction.type === 'income' ? '+' : ''}{formatCurrency(transaction.amount)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{transaction.date}</p>
-                  </div>
-                </div>
+                </Link>
               ))}
             </div>
           </CardContent>
         </Card>
 
-        {/* Budget Overview */}
-        <Card className="col-span-3">
+        {/* Budget Overview - Right side */}
+        <Card className="shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>Budget Overview</CardTitle>
@@ -586,13 +348,13 @@ export default function HomePage() {
             </div>
             <Link href="/budgeting">
               <Button variant="outline" size="sm">
-                Manage <Settings className="h-3 w-3 ml-1" />
+                <Settings className="h-3 w-3" />
               </Button>
             </Link>
           </CardHeader>
           <CardContent>
-            <div className="space-y-6">
-              {budgetOverview.map((budget) => {
+            <div className="space-y-4">
+              {budgetOverview.slice(0, 3).map((budget) => {
                 const percentage = (budget.spent / budget.budget) * 100;
                 const isOverBudget = percentage > 100;
                 
@@ -603,24 +365,19 @@ export default function HomePage() {
                         <span className={budget.color}>{budget.icon}</span>
                         <span className="text-sm font-medium">{budget.category}</span>
                       </div>
-                      <span className="text-sm text-muted-foreground">
-                        {formatCurrency(budget.spent)} / {formatCurrency(budget.budget)}
+                      <span className="text-xs text-muted-foreground">
+                        {Math.round(percentage)}%
                       </span>
                     </div>
-                    <div className="space-y-1">
-                      <Progress 
-                        value={Math.min(percentage, 100)} 
-                        className="h-2"
-                      />
-                      <div className="text-xs text-muted-foreground flex justify-between">
-                        <span>{Math.round(percentage)}% used</span>
-                        {isOverBudget && (
-                          <span className="text-error font-medium">
-                            Over by {formatCurrency(budget.spent - budget.budget)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                    <Progress 
+                      value={Math.min(percentage, 100)} 
+                      className="h-2"
+                    />
+                    {isOverBudget && (
+                      <span className="text-xs text-error">
+                        Over by {formatCurrency(budget.spent - budget.budget)}
+                      </span>
+                    )}
                   </div>
                 );
               })}
@@ -628,6 +385,51 @@ export default function HomePage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Recent Transactions - Full width as originally requested */}
+      <Card className="shadow-lg">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Recent Transactions</CardTitle>
+            <CardDescription>Your latest financial activity</CardDescription>
+          </div>
+          <Link href="/transactions">
+            <Button variant="outline" size="sm">
+              View All <ArrowRight className="h-3 w-3 ml-1" />
+            </Button>
+          </Link>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {recentTransactions.map((transaction) => (
+              <div key={transaction.id} className="flex items-center space-x-4 py-2">
+                <Avatar className="h-10 w-10 flex-shrink-0">
+                  <AvatarFallback className={transaction.type === 'income' ? 'bg-success/10' : 'bg-muted'}>
+                    {transaction.icon}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{transaction.description}</p>
+                  <p className="text-xs text-muted-foreground">{transaction.category}</p>
+                </div>
+                <div className="flex flex-col items-end text-right min-w-[80px]">
+                  <Badge className={`text-xs mb-1 px-3 py-1 rounded-full font-medium ${getPersonBadgeColor(transaction.responsiblePerson)}`}>
+                    {transaction.responsiblePerson}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">{transaction.date}</span>
+                </div>
+                <div className="text-right min-w-[100px] flex-shrink-0">
+                  <p className={`text-sm font-medium ${
+                    transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {transaction.type === 'income' ? '+' : ''}{formatCurrency(transaction.amount)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
