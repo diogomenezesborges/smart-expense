@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     const result = await aiCategorizationService.categorizeTransaction({
       description,
       amount,
-      merchantName,
+      merchantName: merchantName || '',
       flow: flow || (amount >= 0 ? 'ENTRADA' : 'SAIDA'),
       date: new Date(),
     });

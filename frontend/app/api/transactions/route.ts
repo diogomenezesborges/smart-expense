@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     
     if (majorCategory) {
       where.category = {
-        majorCategory: majorCategory as any,
+        majorCategory: majorCategory,
       };
     }
     
@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: transactions,
+      transactions,
       pagination: {
         page,
         limit,
@@ -125,7 +125,8 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error fetching transactions:', error);
+    const { logError } = await import('@/lib/utils/logger');
+    logError('Error fetching transactions:', error);
     return NextResponse.json(
       { 
         success: false, 
@@ -151,7 +152,7 @@ export async function POST(request: NextRequest) {
     
     const transactionData = {
       ...validatedData,
-      month: validatedData.month || monthNames[date.getMonth()] as any,
+      month: validatedData.month || monthNames[date.getMonth()] as 'JANEIRO' | 'FEVEREIRO' | 'MARCO' | 'ABRIL' | 'MAIO' | 'JUNHO' | 'JULHO' | 'AGOSTO' | 'SETEMBRO' | 'OUTUBRO' | 'NOVEMBRO' | 'DEZEMBRO',
       year: validatedData.year || date.getFullYear(),
     };
 
@@ -171,7 +172,8 @@ export async function POST(request: NextRequest) {
     }, { status: 201 });
 
   } catch (error) {
-    console.error('Error creating transaction:', error);
+    const { logError } = await import('@/lib/utils/logger');
+    logError('Error creating transaction:', error);
     return NextResponse.json(
       { 
         success: false, 

@@ -1,0 +1,251 @@
+name: Security Scans
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run weekly security scans on Mondays at 2 AM UTC
+    - cron: '0 2 * * 1'
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+jobs:
+  # CodeQL Analysis for SAST
+  codeql-analysis:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'javascript', 'typescript' ]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+        queries: +security-and-quality
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install dependencies
+      working-directory: ./frontend
+      run: npm ci
+
+    - name: Build application
+      working-directory: ./frontend
+      run: npm run build
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{ matrix.language }}"
+
+  # Dependency Vulnerability Scan
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install dependencies
+      working-directory: ./frontend
+      run: npm ci
+
+    - name: Run npm audit
+      working-directory: ./frontend
+      run: |
+        npm audit --audit-level=moderate --json > npm-audit-results.json || true
+        
+    - name: Upload npm audit results
+      uses: actions/upload-artifact@v4
+      with:
+        name: npm-audit-results
+        path: frontend/npm-audit-results.json
+
+    - name: Run Snyk security scan
+      uses: snyk/actions/node@master
+      continue-on-error: true
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --severity-threshold=high --file=frontend/package.json
+        json: true
+
+    - name: Upload Snyk results to GitHub Code Scanning
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: snyk.sarif
+
+  # Container Security Scan (if using Docker)
+  container-scan:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'schedule'
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Build Docker image
+      run: |
+        if [ -f "Dockerfile" ]; then
+          docker build -t smart-expense:${{ github.sha }} .
+        else
+          echo "No Dockerfile found, skipping container scan"
+          exit 0
+        fi
+
+    - name: Run Trivy vulnerability scanner
+      if: success()
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'smart-expense:${{ github.sha }}'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab  
+      if: success()
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # Secret Scanning (using GitLeaks)
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Run GitLeaks
+      uses: gitleaks/gitleaks-action@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE}}
+
+  # License Compliance Check
+  license-check:
+    name: License Compliance
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install dependencies
+      working-directory: ./frontend
+      run: npm ci
+
+    - name: Install license-checker
+      run: npm install -g license-checker
+
+    - name: Check licenses
+      working-directory: ./frontend
+      run: |
+        license-checker --json --out license-report.json
+        
+        # Check for GPL and other copyleft licenses
+        license-checker --failOn 'GPL;AGPL;LGPL;MPL' --excludePrivatePackages
+
+    - name: Upload license report
+      uses: actions/upload-artifact@v4
+      with:
+        name: license-report
+        path: frontend/license-report.json
+
+  # Security Configuration Check
+  security-config-check:
+    name: Security Configuration Check
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Check for security misconfigurations
+      run: |
+        # Check for common security issues
+        
+        # 1. Check for exposed secrets in config files
+        if grep -r "api_key\|secret\|password\|token" --include="*.json" --include="*.js" --include="*.ts" .; then
+          echo "⚠️ Potential secrets found in configuration files"
+        fi
+        
+        # 2. Check for HTTPS enforcement
+        if grep -r "http://" --include="*.js" --include="*.ts" --include="*.json" .; then
+          echo "⚠️ HTTP URLs found - ensure HTTPS is used in production"
+        fi
+        
+        # 3. Check for secure headers configuration
+        if [ ! -f "frontend/next.config.js" ] || ! grep -q "headers" frontend/next.config.js; then
+          echo "⚠️ Security headers may not be configured"
+        fi
+        
+        # 4. Check for environment variable usage
+        if ! grep -q "process.env" frontend/app/**/*.ts; then
+          echo "ℹ️ Environment variables usage check passed"
+        fi
+
+    - name: Check package.json for security scripts
+      working-directory: ./frontend
+      run: |
+        if ! grep -q "audit" package.json; then
+          echo "⚠️ No security audit script found in package.json"
+        fi
+
+  # Notify on critical security issues
+  security-notification:
+    name: Security Notification
+    runs-on: ubuntu-latest
+    needs: [codeql-analysis, dependency-scan, secret-scan]
+    if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
+
+    steps:
+    - name: Send security alert
+      uses: 8398a7/action-slack@v3
+      with:
+        status: failure
+        text: |
+          🚨 Security scan failed for ${{ github.repository }}
+          
+          Branch: ${{ github.ref }}
+          Commit: ${{ github.sha }}
+          
+          Please review the security findings immediately.
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

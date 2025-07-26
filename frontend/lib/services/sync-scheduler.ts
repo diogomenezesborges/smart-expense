@@ -137,7 +137,7 @@ export class SyncScheduler {
     }
   }
 
-  private async logSyncResult(jobId: string, result: any) {
+  private async logSyncResult(jobId: string, result: Record<string, unknown>) {
     try {
       // Create an audit log entry for the sync
       await prisma.auditLog.create({
@@ -157,7 +157,7 @@ export class SyncScheduler {
     }
   }
 
-  private async logSyncError(jobId: string, error: any) {
+  private async logSyncError(jobId: string, error: Error | unknown) {
     try {
       await prisma.auditLog.create({
         data: {
@@ -222,7 +222,7 @@ export class SyncScheduler {
     }));
   }
 
-  async triggerManualSync(jobId?: string): Promise<any> {
+  async triggerManualSync(jobId?: string): Promise<Record<string, unknown>> {
     if (jobId) {
       await this.executeSyncJob(jobId);
     } else {
@@ -252,12 +252,12 @@ export class SyncScheduler {
       const errors = syncLogs.filter(log => log.action === 'SYNC_ERROR');
 
       const totalCreated = completed.reduce((sum, log) => {
-        const values = log.newValues as any;
+        const values = log.newValues as Record<string, unknown>;
         return sum + (values?.created || 0);
       }, 0);
 
       const totalUpdated = completed.reduce((sum, log) => {
-        const values = log.newValues as any;
+        const values = log.newValues as Record<string, unknown>;
         return sum + (values?.updated || 0);
       }, 0);
 
@@ -272,8 +272,8 @@ export class SyncScheduler {
         lastSync: syncLogs[0]?.timestamp || null,
         recentErrors: errors.slice(0, 5).map(log => ({
           timestamp: log.timestamp,
-          error: (log.newValues as any)?.error,
-          jobId: (log.newValues as any)?.jobId,
+          error: (log.newValues as Record<string, unknown>)?.error,
+          jobId: (log.newValues as Record<string, unknown>)?.jobId,
         })),
       };
     } catch (error) {

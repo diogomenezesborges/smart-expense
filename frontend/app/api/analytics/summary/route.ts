@@ -113,21 +113,48 @@ export async function GET(request: NextRequest) {
       expenses: Number(item.expenses),
     }));
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        summary: {
-          totalIncome,
-          totalOutgoings,
-          netAmount,
-          transactionCount,
-          period: {
-            from: dateFrom ? new Date(dateFrom) : null,
-            to: dateTo ? new Date(dateTo) : null,
-          },
+    // Get current month data
+    const currentMonth = new Date().getMonth() + 1;
+    const currentYear = new Date().getFullYear();
+    
+    const thisMonthData = await Promise.all([
+      prisma.transaction.aggregate({
+        where: { 
+          ...where, 
+          flow: 'ENTRADA',
+          AND: [
+            { date: { gte: new Date(currentYear, currentMonth - 1, 1) } },
+            { date: { lt: new Date(currentYear, currentMonth, 1) } }
+          ]
         },
-        categoryBreakdown: enrichedBreakdown.slice(0, 10), // Top 10 categories
-        monthlyTrend: formattedTrend,
+        _sum: { incomes: true },
+      }),
+      prisma.transaction.aggregate({
+        where: { 
+          ...where, 
+          flow: 'SAIDA',
+          AND: [
+            { date: { gte: new Date(currentYear, currentMonth - 1, 1) } },
+            { date: { lt: new Date(currentYear, currentMonth, 1) } }
+          ]
+        },
+        _sum: { outgoings: true },
+      }),
+    ]);
+
+    const thisMonthIncome = thisMonthData[0]._sum.incomes?.toNumber() || 0;
+    const thisMonthExpenses = thisMonthData[1]._sum.outgoings?.toNumber() || 0;
+    const thisMonthNet = thisMonthIncome - thisMonthExpenses;
+
+    return NextResponse.json({
+      totalIncome,
+      totalExpenses: totalOutgoings,
+      netAmount,
+      transactionCount,
+      thisMonth: {
+        income: thisMonthIncome,
+        expenses: thisMonthExpenses,
+        net: thisMonthNet,
       },
     });
 

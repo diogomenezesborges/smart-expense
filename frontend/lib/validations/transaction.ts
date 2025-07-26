@@ -93,15 +93,59 @@ export const TransactionSchema = z.object({
 );
 
 // Create transaction schema (for API endpoints)
-export const CreateTransactionSchema = TransactionSchema.omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const CreateTransactionSchema = z.object({
+  date: z.coerce.date({
+    errorMap: () => ({ message: 'Valid date is required' })
+  }),
+  originId: z.string().cuid('Invalid origin ID'),
+  bankId: z.string().cuid('Invalid bank ID'),
+  flow: TransactionFlowSchema,
+  categoryId: z.string().cuid('Invalid category ID'),
+  description: z.string().min(1, 'Description is required').max(500),
+  incomes: z.coerce.number().positive().optional().nullable(),
+  outgoings: z.coerce.number().positive().optional().nullable(),
+  notes: z.string().max(1000).optional().nullable(),
+  month: MonthSchema,
+  year: z.number().int().min(2020).max(2030),
+  externalId: z.string().optional().nullable(),
+  rawData: z.record(z.unknown()).optional().nullable(),
+  aiConfidence: z.number().min(0).max(1).optional().nullable(),
+  isAiGenerated: z.boolean().default(false),
+  isValidated: z.boolean().default(false),
+}).refine(
+  (data) => {
+    // Ensure that incomes is set for ENTRADA and outgoings for SAIDA
+    if (data.flow === 'ENTRADA') {
+      return data.incomes !== null && data.incomes !== undefined && data.incomes > 0;
+    } else {
+      return data.outgoings !== null && data.outgoings !== undefined && data.outgoings > 0;
+    }
+  },
+  {
+    message: 'Amount must be provided and positive for the transaction flow',
+    path: ['amount'],
+  }
+);
 
 // Update transaction schema (all fields optional except ID)
-export const UpdateTransactionSchema = TransactionSchema.partial().extend({
+export const UpdateTransactionSchema = z.object({
   id: z.string().cuid('Transaction ID is required'),
+  date: z.coerce.date().optional(),
+  originId: z.string().cuid().optional(),
+  bankId: z.string().cuid().optional(),
+  flow: TransactionFlowSchema.optional(),
+  categoryId: z.string().cuid().optional(),
+  description: z.string().min(1).max(500).optional(),
+  incomes: z.coerce.number().positive().optional().nullable(),
+  outgoings: z.coerce.number().positive().optional().nullable(),
+  notes: z.string().max(1000).optional().nullable(),
+  month: MonthSchema.optional(),
+  year: z.number().int().min(2020).max(2030).optional(),
+  externalId: z.string().optional().nullable(),
+  rawData: z.record(z.unknown()).optional().nullable(),
+  aiConfidence: z.number().min(0).max(1).optional().nullable(),
+  isAiGenerated: z.boolean().optional(),
+  isValidated: z.boolean().optional(),
 });
 
 // Transaction filters schema
@@ -155,7 +199,52 @@ export const PaginationSchema = z.object({
 });
 
 // Combined query schema for API endpoints
-export const TransactionQuerySchema = TransactionFiltersSchema.merge(PaginationSchema);
+export const TransactionQuerySchema = z.object({
+  // Filters
+  dateFrom: z.coerce.date().optional(),
+  dateTo: z.coerce.date().optional(),
+  originId: z.string().cuid().optional(),
+  bankId: z.string().cuid().optional(),
+  categoryId: z.string().cuid().optional(),
+  flow: TransactionFlowSchema.optional(),
+  majorCategory: MajorCategorySchema.optional(),
+  minAmount: z.coerce.number().positive().optional(),
+  maxAmount: z.coerce.number().positive().optional(),
+  description: z.string().optional(),
+  month: MonthSchema.optional(),
+  year: z.coerce.number().int().min(2020).max(2030).optional(),
+  isValidated: z.boolean().optional(),
+  isAiGenerated: z.boolean().optional(),
+  // Pagination
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  sortBy: z.string().optional().default('date'),
+  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+}).refine(
+  (data) => {
+    // Ensure dateFrom is before dateTo
+    if (data.dateFrom && data.dateTo) {
+      return data.dateFrom <= data.dateTo;
+    }
+    return true;
+  },
+  {
+    message: 'dateFrom must be before dateTo',
+    path: ['dateTo'],
+  }
+).refine(
+  (data) => {
+    // Ensure minAmount is less than maxAmount
+    if (data.minAmount && data.maxAmount) {
+      return data.minAmount <= data.maxAmount;
+    }
+    return true;
+  },
+  {
+    message: 'minAmount must be less than or equal to maxAmount',
+    path: ['maxAmount'],
+  }
+);
 
 // User schema
 export const UserSchema = z.object({
@@ -176,11 +265,10 @@ export const LoginSchema = z.object({
 });
 
 // Register schema
-export const RegisterSchema = UserSchema.pick({
-  email: true,
-  name: true,
-  password: true,
-}).extend({
+export const RegisterSchema = z.object({
+  email: z.string().email('Invalid email format'),
+  name: z.string().min(1, 'Name is required').max(100),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
   confirmPassword: z.string(),
 }).refine(
   (data) => data.password === data.confirmPassword,
@@ -197,7 +285,24 @@ export const BulkTransactionSchema = z.object({
 
 export const BulkUpdateSchema = z.object({
   ids: z.array(z.string().cuid()).min(1, 'At least one ID is required'),
-  updates: UpdateTransactionSchema.omit({ id: true }),
+  updates: z.object({
+    date: z.coerce.date().optional(),
+    originId: z.string().cuid().optional(),
+    bankId: z.string().cuid().optional(),
+    flow: TransactionFlowSchema.optional(),
+    categoryId: z.string().cuid().optional(),
+    description: z.string().min(1).max(500).optional(),
+    incomes: z.coerce.number().positive().optional().nullable(),
+    outgoings: z.coerce.number().positive().optional().nullable(),
+    notes: z.string().max(1000).optional().nullable(),
+    month: MonthSchema.optional(),
+    year: z.number().int().min(2020).max(2030).optional(),
+    externalId: z.string().optional().nullable(),
+    rawData: z.record(z.unknown()).optional().nullable(),
+    aiConfidence: z.number().min(0).max(1).optional().nullable(),
+    isAiGenerated: z.boolean().optional(),
+    isValidated: z.boolean().optional(),
+  }),
 });
 
 export const BulkDeleteSchema = z.object({
