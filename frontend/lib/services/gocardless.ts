@@ -100,7 +100,7 @@ export class GoCardlessService {
     dateTo?: string
   ): Promise<GoCardlessTransaction[]> {
     try {
-      const params: any = {};
+      const params: Record<string, string> = {};
       if (dateFrom) params.date_from = dateFrom;
       if (dateTo) params.date_to = dateTo;
 
